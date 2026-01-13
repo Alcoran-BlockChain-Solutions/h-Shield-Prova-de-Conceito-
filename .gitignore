@@ -1,0 +1,25 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Stellar credentials
+.env.stellar
+
+# Supabase local
+supabase/.branches
+supabase/.temp
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# BMAD output (optional - uncomment if you don't want to track)
+# _bmad-output/
