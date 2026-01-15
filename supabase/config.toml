@@ -1,9 +1,6 @@
 # HarvestShield Supabase Configuration
 # Reference: https://supabase.com/docs/guides/cli/config
 
-[project]
-name = "harvestshield"
-
 [api]
 enabled = true
 port = 54321
@@ -13,7 +10,7 @@ max_rows = 1000
 
 [db]
 port = 54322
-major_version = 15
+major_version = 17
 
 [studio]
 enabled = true
@@ -25,5 +22,8 @@ enabled = false
 [auth]
 enabled = false
 
-[functions]
+[functions.oracle]
+verify_jwt = false
+
+[functions.get-readings]
 verify_jwt = false

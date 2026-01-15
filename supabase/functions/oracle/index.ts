@@ -3,13 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import {
-  Keypair,
-  Networks,
-  Operation,
-  Server,
-  TransactionBuilder,
-} from "https://esm.sh/@stellar/stellar-sdk@11.2.2";
+import * as StellarSdk from "https://esm.sh/@stellar/stellar-sdk@11.2.2";
 
 // ============================================================================
 // TYPES
@@ -146,19 +140,19 @@ async function recordOnStellar(
   }
 
   try {
-    const server = new Server("https://horizon-testnet.stellar.org");
-    const sourceKeypair = Keypair.fromSecret(stellarSecretKey);
+    const server = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.org");
+    const sourceKeypair = StellarSdk.Keypair.fromSecret(stellarSecretKey);
     const account = await server.loadAccount(sourceKeypair.publicKey());
 
     // ManageData key limited to 64 bytes, value to 64 bytes
     const dataKey = `r_${timestamp}`;
 
-    const transaction = new TransactionBuilder(account, {
+    const transaction = new StellarSdk.TransactionBuilder(account, {
       fee: "100",
-      networkPassphrase: Networks.TESTNET,
+      networkPassphrase: StellarSdk.Networks.TESTNET,
     })
       .addOperation(
-        Operation.manageData({
+        StellarSdk.Operation.manageData({
           name: dataKey,
           value: dataHash,
         })
