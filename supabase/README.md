@@ -141,6 +141,69 @@ Após receber o `tx_hash`, verifique em:
 https://stellar.expert/explorer/testnet/tx/TX_HASH_HERE
 ```
 
+## Scripts Python
+
+Na pasta `scripts/`:
+
+```bash
+# Enviar uma leitura
+python3 oracle.py
+
+# Buscar leituras
+python3 get_readings.py
+
+# Simular ESP32 (1 req/segundo)
+python3 simulate_esp32.py
+```
+
+Configure o `.env`:
+```
+SUPABASE_URL = "https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1"
+SUPABASE_ANON_KEY = "your-anon-key"
+```
+
+---
+
+## Análise de Custos
+
+### Stellar (Mainnet)
+
+| Métrica | Valor |
+|---------|-------|
+| Fee por transação | 0.00001 XLM (100 stroops) |
+| 1 req/segundo | 3,600 tx/hora |
+| **Custo por hora** | **0.036 XLM** |
+| Custo por dia | 0.864 XLM |
+| Custo por mês | ~26 XLM (~$2.60 @ $0.10/XLM) |
+
+### Supabase
+
+| Recurso | Free Tier | Pro ($25/mês) |
+|---------|-----------|---------------|
+| Edge Functions | 500k invocações/mês | 2M invocações/mês |
+| Database | 500MB | 8GB |
+| Bandwidth | 5GB | 250GB |
+
+### Cenários de Uso
+
+| Frequência | Stellar/mês | Supabase Invocações/mês | Plano Recomendado |
+|------------|-------------|------------------------|-------------------|
+| 1 req/segundo | ~26 XLM | 2.6M | Pro |
+| 1 req/minuto | ~0.43 XLM | 43k | Free ✅ |
+| 1 req/5 minutos | ~0.09 XLM | 8.6k | Free ✅ |
+| 1 req/hora | ~0.007 XLM | 720 | Free ✅ |
+
+### Recomendação
+
+Para produção com **1 sensor**, usar intervalo de **1 minuto**:
+- Stellar: ~$0.04/mês
+- Supabase: Free tier
+- **Total: ~$0.04/mês**
+
+Para **múltiplos sensores** ou maior frequência, considerar Pro Plan ($25/mês).
+
+---
+
 ## Fluxo de Dados v0.1
 
 ```
@@ -162,3 +225,9 @@ ESP32/Client
 │Insert │  │ManageData│
 └───────┘  └────────┘
 ```
+
+
+PROOF OF CONCEPT
+
+https://stellar.expert/explorer/testnet/account/GAEMQIJIAXII4PZUCDMCDGYY342LVR5P6XENNDYTKRCQW7MU7I2ROR7B
+https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/get-readings
