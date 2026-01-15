@@ -134,6 +134,75 @@ Sistema de monitoramento climático que:
 - [ ] Query para verificar transação blockchain
 - [ ] Ordenação por data (desc por padrão)
 
+### RF07 - Configuração de Rede Stellar (Mainnet/Testnet)
+
+**Descrição:** O sistema deve suportar alternância entre Stellar Testnet e Mainnet via variável de ambiente.
+
+**Critérios de Aceite:**
+- [ ] Variável de ambiente `STELLAR_NETWORK` definida (`testnet` | `mainnet`)
+- [ ] Oráculo seleciona automaticamente a network passphrase correta
+- [ ] Oráculo seleciona automaticamente o Horizon URL correto
+- [ ] Logs indicam claramente qual rede está sendo utilizada
+- [ ] Validação impede inicialização com valor inválido
+- [ ] Documentação atualizada com instruções de configuração
+
+**Valores:**
+
+| STELLAR_NETWORK | Horizon URL | Network Passphrase |
+|-----------------|-------------|-------------------|
+| `testnet` | https://horizon-testnet.stellar.org | Test SDF Network ; September 2015 |
+| `mainnet` | https://horizon.stellar.org | Public Global Stellar Network ; September 2015 |
+
+### RF08 - Autenticação Segura de Dispositivos IoT
+
+**Descrição:** O sistema deve autenticar dispositivos IoT de forma segura para prevenir envio de dados falsos ou não autorizados.
+
+**Critérios de Aceite:**
+- [ ] Cada dispositivo possui um `device_secret` único (gerado no provisionamento)
+- [ ] Requisições incluem assinatura HMAC-SHA256 do payload
+- [ ] Oráculo valida assinatura antes de processar dados
+- [ ] Tabela `devices` criada para registro de dispositivos autorizados
+- [ ] Endpoint de provisionamento para registrar novos dispositivos
+- [ ] Requisições com assinatura inválida retornam 401 Unauthorized
+- [ ] Rate limiting por device_id para prevenir abuso
+- [ ] Logs de tentativas de autenticação (sucesso/falha)
+
+**Fluxo de Autenticação:**
+
+```
+┌─────────────┐                              ┌─────────────┐
+│   ESP32     │                              │   Oráculo   │
+│             │                              │             │
+│ 1. Gera payload JSON                       │             │
+│ 2. Calcula HMAC-SHA256(payload, secret)    │             │
+│ 3. Envia: payload + signature + device_id  │             │
+│ ──────────────────────────────────────────>│             │
+│             │                              │ 4. Busca secret do device_id
+│             │                              │ 5. Recalcula HMAC
+│             │                              │ 6. Compara signatures
+│             │                              │ 7. Se OK: processa
+│             │                              │    Se FAIL: 401
+│ <──────────────────────────────────────────│             │
+└─────────────┘                              └─────────────┘
+```
+
+**Schema Adicional:**
+
+```sql
+CREATE TABLE devices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id VARCHAR(50) UNIQUE NOT NULL,
+    device_secret VARCHAR(64) NOT NULL,
+    name VARCHAR(100),
+    location VARCHAR(200),
+    is_active BOOLEAN DEFAULT true,
+    last_seen_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_devices_device_id ON devices(device_id);
+```
+
 ---
 
 ## 4. Requisitos Não-Funcionais
@@ -314,6 +383,9 @@ Sistema de monitoramento climático que:
 - [ ] Dados consultáveis via GraphQL
 - [ ] Transação verificável no Stellar Explorer
 - [ ] Documentação completa
+- [ ] Configuração Mainnet/Testnet via ENV VAR funcionando
+- [ ] Autenticação IoT com HMAC-SHA256 implementada
+- [ ] Tabela de dispositivos provisionados criada
 
 ### 9.2 Métricas de Validação
 
