@@ -1,4 +1,4 @@
-// HarvestShield Get Readings - Edge Function v0.1
+// HarvestShield Get Readings - Edge Function v0.4
 // Retrieves readings from database with optional filters
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";

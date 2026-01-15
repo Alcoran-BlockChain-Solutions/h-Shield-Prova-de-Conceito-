@@ -70,8 +70,8 @@ supabase functions deploy get-readings
 
 ```bash
 curl -X POST \
-  'https://YOUR_PROJECT.supabase.co/functions/v1/oracle' \
-  -H 'Authorization: Bearer YOUR_ANON_KEY' \
+  'https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/oracle' \
+  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkY3VldWR6ZHZnaXRucWdpdXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjkxMzEsImV4cCI6MjA4Mzg0NTEzMX0.n8CTVq8b7mA2eQrtmWoriDLeh9b8UNV1m9idEr9FQVY' \
   -H 'Content-Type: application/json' \
   -d '{
     "device_id": "esp32-farm-001",
@@ -100,16 +100,16 @@ curl -X POST \
 
 ```bash
 # Todas as leituras (últimas 100)
-curl 'https://YOUR_PROJECT.supabase.co/functions/v1/get-readings' \
-  -H 'Authorization: Bearer YOUR_ANON_KEY'
+curl 'https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/get-readings' \
+  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkY3VldWR6ZHZnaXRucWdpdXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjkxMzEsImV4cCI6MjA4Mzg0NTEzMX0.n8CTVq8b7mA2eQrtmWoriDLeh9b8UNV1m9idEr9FQVY'
 
 # Filtrar por device
-curl 'https://YOUR_PROJECT.supabase.co/functions/v1/get-readings?device_id=esp32-farm-001' \
-  -H 'Authorization: Bearer YOUR_ANON_KEY'
+curl 'https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/get-readings?device_id=esp32-farm-001' \
+  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkY3VldWR6ZHZnaXRucWdpdXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjkxMzEsImV4cCI6MjA4Mzg0NTEzMX0.n8CTVq8b7mA2eQrtmWoriDLeh9b8UNV1m9idEr9FQVY'
 
 # Com paginação
-curl 'https://YOUR_PROJECT.supabase.co/functions/v1/get-readings?limit=10&offset=0' \
-  -H 'Authorization: Bearer YOUR_ANON_KEY'
+curl 'https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/get-readings?limit=10&offset=0' \
+  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkY3VldWR6ZHZnaXRucWdpdXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjkxMzEsImV4cCI6MjA4Mzg0NTEzMX0.n8CTVq8b7mA2eQrtmWoriDLeh9b8UNV1m9idEr9FQVY'
 ```
 
 **Resposta:**

@@ -1,9 +1,8 @@
-// HarvestShield Oracle - Edge Function v0.1
+// HarvestShield Oracle - Edge Function v0.8
 // Receives sensor data, normalizes, stores in DB, and records hash on Stellar
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as StellarSdk from "https://esm.sh/@stellar/stellar-sdk@11.2.2";
 
 // ============================================================================
 // TYPES
@@ -135,14 +134,32 @@ async function recordOnStellar(
 ): Promise<{ success: boolean; txHash?: string; error?: string }> {
   const stellarSecretKey = Deno.env.get("STELLAR_SECRET_KEY");
 
+  console.log("[Stellar] Starting recordOnStellar");
+  console.log("[Stellar] Secret key configured:", !!stellarSecretKey);
+
   if (!stellarSecretKey) {
     return { success: false, error: "STELLAR_SECRET_KEY not configured" };
   }
 
   try {
-    const server = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.org");
+    // Dynamic import - use browser bundle (pure JS, no native addons)
+    const StellarSdk = await import("https://esm.sh/@stellar/stellar-sdk@11.2.2?bundle&target=browser");
+    console.log("[Stellar] SDK loaded, keys:", Object.keys(StellarSdk));
+
+    // Try different paths for Server
+    const HorizonServer = StellarSdk.Horizon?.Server || StellarSdk.Server;
+    console.log("[Stellar] HorizonServer found:", !!HorizonServer);
+
+    if (!HorizonServer) {
+      return { success: false, error: "Stellar Server class not found in SDK" };
+    }
+
+    const server = new HorizonServer("https://horizon-testnet.stellar.org");
     const sourceKeypair = StellarSdk.Keypair.fromSecret(stellarSecretKey);
+    console.log("[Stellar] Public key:", sourceKeypair.publicKey());
+
     const account = await server.loadAccount(sourceKeypair.publicKey());
+    console.log("[Stellar] Account loaded, sequence:", account.sequence);
 
     // ManageData key limited to 64 bytes, value to 64 bytes
     const dataKey = `r_${timestamp}`;
@@ -161,10 +178,14 @@ async function recordOnStellar(
       .build();
 
     transaction.sign(sourceKeypair);
+    console.log("[Stellar] Transaction built and signed");
+
     const result = await server.submitTransaction(transaction);
+    console.log("[Stellar] Transaction submitted, hash:", result.hash);
 
     return { success: true, txHash: result.hash };
   } catch (error) {
+    console.error("[Stellar] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown Stellar error";
     return { success: false, error: errorMessage };
   }
