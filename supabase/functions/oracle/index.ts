@@ -1,4 +1,4 @@
-// HarvestShield Oracle - Edge Function v0.8
+// HarvestShield Oracle - Edge Function v0.9
 // Receives sensor data, normalizes, stores in DB, and records hash on Stellar
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -143,19 +143,27 @@ async function recordOnStellar(
 
   try {
     // Dynamic import - use browser bundle (pure JS, no native addons)
-    const StellarSdk = await import("https://esm.sh/@stellar/stellar-sdk@11.2.2?bundle&target=browser");
-    console.log("[Stellar] SDK loaded, keys:", Object.keys(StellarSdk));
+    const StellarModule = await import("https://esm.sh/@stellar/stellar-sdk@11.2.2?bundle&target=browser");
+    // Get the default export which contains all the main classes
+    const Stellar = StellarModule.default || StellarModule;
+    console.log("[Stellar] SDK loaded, keys:", Object.keys(Stellar));
 
-    // Try different paths for Server
-    const HorizonServer = StellarSdk.Horizon?.Server || StellarSdk.Server;
+    // Get classes - they may be on Stellar directly or nested
+    const Keypair = Stellar.Keypair || StellarModule.Keypair;
+    const TransactionBuilder = Stellar.TransactionBuilder || StellarModule.TransactionBuilder;
+    const Operation = Stellar.Operation || StellarModule.Operation;
+    const Networks = Stellar.Networks || StellarModule.Networks;
+    const HorizonServer = StellarModule.Horizon?.Server || Stellar.Horizon?.Server || Stellar.Server;
+
+    console.log("[Stellar] Classes found - Keypair:", !!Keypair, "TransactionBuilder:", !!TransactionBuilder);
     console.log("[Stellar] HorizonServer found:", !!HorizonServer);
 
-    if (!HorizonServer) {
-      return { success: false, error: "Stellar Server class not found in SDK" };
+    if (!HorizonServer || !Keypair) {
+      return { success: false, error: "Stellar classes not found in SDK" };
     }
 
     const server = new HorizonServer("https://horizon-testnet.stellar.org");
-    const sourceKeypair = StellarSdk.Keypair.fromSecret(stellarSecretKey);
+    const sourceKeypair = Keypair.fromSecret(stellarSecretKey);
     console.log("[Stellar] Public key:", sourceKeypair.publicKey());
 
     const account = await server.loadAccount(sourceKeypair.publicKey());
@@ -164,12 +172,12 @@ async function recordOnStellar(
     // ManageData key limited to 64 bytes, value to 64 bytes
     const dataKey = `r_${timestamp}`;
 
-    const transaction = new StellarSdk.TransactionBuilder(account, {
+    const transaction = new TransactionBuilder(account, {
       fee: "100",
-      networkPassphrase: StellarSdk.Networks.TESTNET,
+      networkPassphrase: Networks.TESTNET,
     })
       .addOperation(
-        StellarSdk.Operation.manageData({
+        Operation.manageData({
           name: dataKey,
           value: dataHash,
         })
