@@ -5,8 +5,8 @@
 
 | Campo | Valor |
 |-------|-------|
-| Versão | 1.0 |
-| Data | 2026-01-13 |
+| Versão | 1.1 |
+| Data | 2026-01-16 |
 | Autor | Lucas Oliveira (Olivmath) |
 | Status | Draft |
 
@@ -57,7 +57,6 @@ Sistema de monitoramento climático que:
 | Sensores físicos | Dados serão simulados |
 | Sistema de energia solar | Não aplicável para PoC |
 | Comunicação LoRa | WiFi é suficiente para PoC |
-| Dashboard/Frontend | Foco no backend |
 | Alertas e notificações | Versão futura |
 | Multi-tenancy | Versão futura |
 
@@ -85,7 +84,7 @@ Sistema de monitoramento climático que:
 - [ ] Valida presença de campos obrigatórios (device_id, pelo menos 1 métrica)
 - [ ] Valida ranges de valores (rejeita dados fora dos limites físicos)
 - [ ] Retorna erro 400 para dados inválidos com mensagem descritiva
-- [ ] Retorna 201 para dados válidos
+- [ ] Retorna 202 Accepted para dados válidos (processamento blockchain assíncrono)
 
 ### RF03 - Normalização de Dados
 
@@ -153,19 +152,25 @@ Sistema de monitoramento climático que:
 | `testnet` | https://horizon-testnet.stellar.org | Test SDF Network ; September 2015 |
 | `mainnet` | https://horizon.stellar.org | Public Global Stellar Network ; September 2015 |
 
-### RF08 - Autenticação Segura de Dispositivos IoT
+### RF08 - Autenticação Segura de Dispositivos IoT (ECDSA)
 
-**Descrição:** O sistema deve autenticar dispositivos IoT de forma segura para prevenir envio de dados falsos ou não autorizados.
+**Descrição:** O sistema deve autenticar dispositivos IoT de forma segura usando criptografia assimétrica (ECDSA P-256) para prevenir envio de dados falsos ou não autorizados.
 
 **Critérios de Aceite:**
-- [ ] Cada dispositivo possui um `device_secret` único (gerado no provisionamento)
-- [ ] Requisições incluem assinatura HMAC-SHA256 do payload
-- [ ] Oráculo valida assinatura antes de processar dados
-- [ ] Tabela `devices` criada para registro de dispositivos autorizados
+- [x] Cada dispositivo possui um par de chaves ECDSA P-256 (pública/privada)
+- [x] Requisições incluem assinatura ECDSA do hash SHA-256 do payload
+- [x] Oráculo valida assinatura usando a chave pública registrada
+- [x] Tabela `devices` criada para registro de dispositivos autorizados
 - [ ] Endpoint de provisionamento para registrar novos dispositivos
-- [ ] Requisições com assinatura inválida retornam 401 Unauthorized
+- [x] Requisições com assinatura inválida retornam 401 Unauthorized
 - [ ] Rate limiting por device_id para prevenir abuso
-- [ ] Logs de tentativas de autenticação (sucesso/falha)
+- [x] Logs de tentativas de autenticação (sucesso/falha)
+
+**Headers de Autenticação:**
+- `X-Device-ID`: Identificador do dispositivo
+- `X-Signature`: Assinatura ECDSA (DER format, base64)
+- `X-Data-Hash`: Hash SHA-256 do payload
+- `X-Timestamp`: Timestamp Unix (opcional, para anti-replay)
 
 **Fluxo de Autenticação:**
 
@@ -174,33 +179,122 @@ Sistema de monitoramento climático que:
 │   ESP32     │                              │   Oráculo   │
 │             │                              │             │
 │ 1. Gera payload JSON                       │             │
-│ 2. Calcula HMAC-SHA256(payload, secret)    │             │
-│ 3. Envia: payload + signature + device_id  │             │
+│ 2. Calcula SHA-256(payload)                │             │
+│ 3. Assina hash com chave privada ECDSA     │             │
+│ 4. Envia: payload + signature + hash       │             │
 │ ──────────────────────────────────────────>│             │
-│             │                              │ 4. Busca secret do device_id
-│             │                              │ 5. Recalcula HMAC
-│             │                              │ 6. Compara signatures
-│             │                              │ 7. Se OK: processa
+│             │                              │ 5. Busca public_key do device_id
+│             │                              │ 6. Verifica assinatura ECDSA
+│             │                              │ 7. Compara hashes
+│             │                              │ 8. Se OK: processa
 │             │                              │    Se FAIL: 401
 │ <──────────────────────────────────────────│             │
 └─────────────┘                              └─────────────┘
 ```
 
-**Schema Adicional:**
+**Schema:**
 
 ```sql
 CREATE TABLE devices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     device_id VARCHAR(50) UNIQUE NOT NULL,
-    device_secret VARCHAR(64) NOT NULL,
+    public_key TEXT NOT NULL,
     name VARCHAR(100),
     location VARCHAR(200),
-    is_active BOOLEAN DEFAULT true,
+    active BOOLEAN DEFAULT true,
     last_seen_at TIMESTAMPTZ,
+    total_readings BIGINT DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_devices_device_id ON devices(device_id);
+```
+
+### RF09 - Dashboard de Visualização (PLANEJADO)
+
+**Descrição:** Página HTML simples para visualização de leituras com filtros e paginação.
+
+**Status:** Não implementado
+
+**Critérios de Aceite:**
+- [ ] Página HTML única (`/dashboard/index.html`) sem build step
+- [ ] Filtro por device_id (dropdown)
+- [ ] Filtro por período (date range)
+- [ ] Paginação (20 itens por página)
+- [ ] Indicador de status blockchain (pending/confirmed/failed)
+- [ ] Link para Stellar Explorer para cada transação
+- [ ] Usa API REST existente (`get-readings`)
+
+**Stack Planejada:**
+- Vanilla JS + Supabase JS Client
+- Sem framework/build step
+- CSS simples inline ou arquivo único
+
+### RF10 - Realtime Subscriptions (PLANEJADO)
+
+**Descrição:** Dashboard atualiza automaticamente quando novos dados são inseridos.
+
+**Status:** Não implementado
+
+**Critérios de Aceite:**
+- [ ] Tabela `readings` com Realtime habilitado via `supabase_realtime` publication
+- [ ] Dashboard subscreve a eventos INSERT na tabela readings
+- [ ] Novos registros aparecem automaticamente (sem refresh manual)
+- [ ] Indicador visual de conexão realtime (conectado/desconectado)
+
+**Código Planejado:**
+```javascript
+supabase
+  .channel('readings')
+  .on('postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'readings' },
+    (payload) => prependToTable(payload.new)
+  )
+  .subscribe();
+```
+
+**Migration Necessária:**
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE readings;
+```
+
+### RF11 - Oracle Assíncrono (PLANEJADO)
+
+**Descrição:** Oracle retorna 202 Accepted imediatamente após validação, processando blockchain em background.
+
+**Status:** Não implementado
+
+**Problema Atual:**
+- Oracle leva ~3 segundos (82% é Stellar TX)
+- IoT fica bloqueado esperando resposta
+
+**Solução Proposta:**
+```
+ANTES: IoT -> [ECDSA] -> [DB] -> [Stellar 2.6s] -> 201 (3s total)
+DEPOIS: IoT -> [ECDSA] -> [DB pending] -> 202 (400ms)
+                              |
+                              +--[Background]--> [Stellar] -> [DB update]
+```
+
+**Critérios de Aceite:**
+- [ ] Retorna 202 Accepted em < 500ms após validação
+- [ ] Salva reading com `blockchain_status: 'pending'`
+- [ ] Processa Stellar TX em background via `EdgeRuntime.waitUntil()`
+- [ ] Atualiza status para `confirmed` ou `failed` após processamento
+- [ ] Nova coluna `blockchain_error` para registrar erros
+
+**Código Chave:**
+```typescript
+// Retorna 202 após validação
+const response = new Response(
+  JSON.stringify({ success: true, status: 'accepted', reading_id }),
+  { status: 202 }
+);
+
+// Processa Stellar em background
+EdgeRuntime.waitUntil(processBlockchainInBackground(readingId, dataHash));
+
+return response;
 ```
 
 ---
@@ -209,11 +303,12 @@ CREATE INDEX idx_devices_device_id ON devices(device_id);
 
 ### RNF01 - Performance
 
-| Métrica | Target |
-|---------|--------|
-| Latência do endpoint Oracle | < 2s (incluindo blockchain) |
-| Throughput | 1 req/min por dispositivo |
-| Disponibilidade | 99% (Supabase SLA) |
+| Métrica | Target Atual | Target Planejado (RF11) |
+|---------|--------------|-------------------------|
+| Latência do endpoint Oracle | < 2s (incluindo blockchain) | < 500ms (202 Accepted) |
+| Processamento Blockchain | Síncrono (~2.6s) | Background (< 5s) |
+| Throughput | 1 req/min por dispositivo | 1 req/min por dispositivo |
+| Disponibilidade | 99% (Supabase SLA) | 99% (Supabase SLA) |
 
 ### RNF02 - Segurança
 
@@ -377,17 +472,23 @@ CREATE INDEX idx_devices_device_id ON devices(device_id);
 
 ### 9.1 MVP Completo Quando:
 
-- [ ] ESP32 enviando dados a cada 60 segundos
-- [ ] Dados validados e normalizados corretamente
-- [ ] Hash registrado na Stellar Testnet
-- [ ] Dados consultáveis via GraphQL
-- [ ] Transação verificável no Stellar Explorer
+- [x] ESP32 enviando dados a cada 60 segundos
+- [x] Dados validados e normalizados corretamente
+- [x] Hash registrado na Stellar Testnet
+- [x] Dados consultáveis via API REST
+- [x] Transação verificável no Stellar Explorer
 - [ ] Documentação completa
 - [ ] Configuração Mainnet/Testnet via ENV VAR funcionando
-- [ ] Autenticação IoT com HMAC-SHA256 implementada
-- [ ] Tabela de dispositivos provisionados criada
+- [x] Autenticação IoT com ECDSA P-256 implementada
+- [x] Tabela de dispositivos provisionados criada
 
-### 9.2 Métricas de Validação
+### 9.2 Próximas Iterações (Planejado):
+
+- [ ] Oracle assíncrono com resposta 202 (RF11)
+- [ ] Dashboard de visualização (RF09)
+- [ ] Realtime subscriptions (RF10)
+
+### 9.3 Métricas de Validação
 
 | Métrica | Target | Como Medir |
 |---------|--------|------------|
@@ -426,4 +527,4 @@ CREATE INDEX idx_devices_device_id ON devices(device_id);
 
 ---
 
-_Documento gerado via BMAD Framework | 2026-01-13_
+_Documento gerado via BMAD Framework | Atualizado: 2026-01-16_

@@ -20,8 +20,8 @@ def load_env():
 load_env()
 
 # Configuration - Use unregistered device (should fail auth)
-DEVICE_ID = "esp32-farm-002"
-PRIVATE_KEY_PATH = os.path.join(os.path.dirname(__file__), "..", "keys", "esp32-farm-002.key")
+DEVICE_ID = "esp32-farm-001"
+PRIVATE_KEY_PATH = os.path.join(os.path.dirname(__file__), "..", "keys", "esp32-farm-001.key")
 
 # Supabase configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL")  # e.g. http://127.0.0.1:54321/functions/v1
