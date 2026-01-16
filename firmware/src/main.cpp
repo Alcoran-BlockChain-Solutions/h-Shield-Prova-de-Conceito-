@@ -11,6 +11,7 @@
 #include "sensors.h"
 #include "http_client.h"
 #include "stats.h"
+#include "crypto.h"
 
 // Configuracoes do dispositivo
 #define DEVICE_ID "esp32-farm-001"
@@ -25,6 +26,7 @@ void setup() {
     Led::init();
     Sensors::init();
     StatsManager::init();
+    Crypto::init();
 
     Serial.println("\n============================================================");
     Serial.println("ESP32 FIRMWARE - HarvestShield");
