@@ -1,8 +1,47 @@
-// HarvestShield Oracle - Edge Function v0.10
+// HarvestShield Oracle - Edge Function v0.11
 // Receives sensor data, validates ECDSA signature, stores in DB, and records hash on Stellar
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// ============================================================================
+// LOGGING UTILITIES
+// ============================================================================
+
+function formatMs(ms: number): string {
+  return ms.toFixed(2);
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(2)} KB`;
+}
+
+function logStep(step: number, name: string, timeMs: number, details?: Record<string, unknown>) {
+  console.log(`┌─ STEP ${step}: ${name} ${"─".repeat(Math.max(0, 40 - name.length))}┐`);
+  console.log(`│ Time: ${formatMs(timeMs)} ms`);
+  if (details) {
+    for (const [key, value] of Object.entries(details)) {
+      console.log(`│ ${key}: ${value}`);
+    }
+  }
+  console.log(`└${"─".repeat(50)}┘`);
+}
+
+function logSummary(requestId: string, steps: { name: string; time: number }[], totalTime: number) {
+  console.log(`\n╔══════════════════════════════════════════════════════════╗`);
+  console.log(`║ REQUEST SUMMARY: ${requestId}`);
+  console.log(`╠══════════════════════════════════════════════════════════╣`);
+
+  for (const step of steps) {
+    const pct = ((step.time / totalTime) * 100).toFixed(1);
+    console.log(`║ ${step.name.padEnd(25)} ${formatMs(step.time).padStart(8)} ms (${pct.padStart(5)}%)`);
+  }
+
+  console.log(`╠══════════════════════════════════════════════════════════╣`);
+  console.log(`║ TOTAL                     ${formatMs(totalTime).padStart(8)} ms`);
+  console.log(`╚══════════════════════════════════════════════════════════╝\n`);
+}
 
 // ============================================================================
 // TYPES
@@ -393,6 +432,10 @@ async function saveToDatabase(
 // ============================================================================
 
 serve(async (req: Request) => {
+  const requestStart = Date.now();
+  const requestId = crypto.randomUUID().substring(0, 8);
+  const timings: { name: string; time: number }[] = [];
+
   // CORS headers
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -412,46 +455,109 @@ serve(async (req: Request) => {
     );
   }
 
+  console.log(`\n╔══════════════════════════════════════════════════════════╗`);
+  console.log(`║ REQUEST #${requestId} - ${new Date().toISOString()}`);
+  console.log(`╚══════════════════════════════════════════════════════════╝`);
+
   try {
-    // Read body as text (needed for signature verification)
+    // ─────────────────────────────────────────────────────────────
+    // STEP 0: Read and parse body
+    // ─────────────────────────────────────────────────────────────
+    const t0 = Date.now();
     const bodyText = await req.text();
     const body = JSON.parse(bodyText);
+    const tParse = Date.now() - t0;
+    timings.push({ name: "Parse body", time: tParse });
+
+    logStep(0, "Parse Body", tParse, {
+      "Body size": formatBytes(bodyText.length),
+      "Device ID": body.device_id || "N/A",
+    });
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Step 0: Authenticate device (ECDSA signature verification)
+    // ─────────────────────────────────────────────────────────────
+    // STEP 1: Authenticate device (ECDSA signature verification)
+    // ─────────────────────────────────────────────────────────────
+    const t1 = Date.now();
     const auth = extractAuthHeaders(req);
     const authResult = await verifyDeviceSignature(supabase, bodyText, auth);
+    const tAuth = Date.now() - t1;
+    timings.push({ name: "ECDSA Auth", time: tAuth });
+
+    logStep(1, "ECDSA Authentication", tAuth, {
+      "Device ID": auth.deviceId || "N/A",
+      "Has signature": !!auth.signature,
+      "Has hash": !!auth.dataHash,
+      "Result": authResult.valid ? "VALID" : `FAILED: ${authResult.error}`,
+    });
 
     if (!authResult.valid) {
-      console.log("[Oracle] Authentication failed:", authResult.error);
+      console.log(`[Oracle] Authentication failed: ${authResult.error}`);
+      logSummary(requestId, timings, Date.now() - requestStart);
       return new Response(
         JSON.stringify({ success: false, error: authResult.error }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("[Oracle] Device authenticated successfully");
-
-    // Step 1: Validate payload
+    // ─────────────────────────────────────────────────────────────
+    // STEP 2: Validate payload
+    // ─────────────────────────────────────────────────────────────
+    const t2 = Date.now();
     const validation = validate(body);
+    const tValidate = Date.now() - t2;
+    timings.push({ name: "Validation", time: tValidate });
+
+    logStep(2, "Validate Payload", tValidate, {
+      "Valid": validation.valid,
+      "Errors": validation.errors.length > 0 ? validation.errors.join(", ") : "None",
+    });
+
     if (!validation.valid) {
+      logSummary(requestId, timings, Date.now() - requestStart);
       return new Response(
         JSON.stringify({ success: false, errors: validation.errors }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Step 2: Normalize
+    // ─────────────────────────────────────────────────────────────
+    // STEP 3: Normalize
+    // ─────────────────────────────────────────────────────────────
+    const t3 = Date.now();
     const normalized = await normalize(validation.data!);
+    const tNormalize = Date.now() - t3;
+    timings.push({ name: "Normalization", time: tNormalize });
 
-    // Step 3: Record on Stellar using IoT's hash
+    logStep(3, "Normalize Data", tNormalize, {
+      "Temp": normalized.temperature !== null ? `${normalized.temperature}°C` : "N/A",
+      "Humidity Air": normalized.humidity_air !== null ? `${normalized.humidity_air}%` : "N/A",
+      "Humidity Soil": normalized.humidity_soil !== null ? `${normalized.humidity_soil}%` : "N/A",
+      "Luminosity": normalized.luminosity !== null ? `${normalized.luminosity} lux` : "N/A",
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // STEP 4: Record on Stellar using IoT's hash
+    // ─────────────────────────────────────────────────────────────
+    const t4 = Date.now();
     const stellarResult = await recordOnStellar(auth.dataHash!, normalized.timestamp);
+    const tStellar = Date.now() - t4;
+    timings.push({ name: "Stellar TX", time: tStellar });
 
-    // Step 4: Save to database
+    logStep(4, "Stellar Blockchain", tStellar, {
+      "Success": stellarResult.success,
+      "TX Hash": stellarResult.txHash ? `${stellarResult.txHash.substring(0, 16)}...` : "N/A",
+      "Error": stellarResult.error || "None",
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // STEP 5: Save to database
+    // ─────────────────────────────────────────────────────────────
+    const t5 = Date.now();
     const readingId = await saveToDatabase(
       supabase,
       normalized,
@@ -459,24 +565,54 @@ serve(async (req: Request) => {
       auth.dataHash!, // Use IoT's hash
       stellarResult
     );
+    const tDatabase = Date.now() - t5;
+    timings.push({ name: "Database Insert", time: tDatabase });
 
-    // Return success response
+    logStep(5, "Database Insert", tDatabase, {
+      "Reading ID": readingId,
+      "Blockchain Status": stellarResult.success ? "confirmed" : "failed",
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // SUMMARY
+    // ─────────────────────────────────────────────────────────────
+    const totalTime = Date.now() - requestStart;
+    logSummary(requestId, timings, totalTime);
+
+    // Calculate overhead percentages
+    const cryptoTime = tAuth;
+    const networkTime = tStellar;
+    const dbTime = tDatabase;
+    console.log(`[Oracle] Breakdown: Crypto ${formatMs(cryptoTime)}ms (${((cryptoTime/totalTime)*100).toFixed(1)}%) | Stellar ${formatMs(networkTime)}ms (${((networkTime/totalTime)*100).toFixed(1)}%) | DB ${formatMs(dbTime)}ms (${((dbTime/totalTime)*100).toFixed(1)}%)`);
+
+    // Build response
+    const responseBody = JSON.stringify({
+      success: true,
+      reading_id: readingId,
+      data_hash: auth.dataHash,
+      blockchain: {
+        success: stellarResult.success,
+        tx_hash: stellarResult.txHash || null,
+        error: stellarResult.error || null,
+      },
+      timing: {
+        total_ms: totalTime,
+        auth_ms: tAuth,
+        stellar_ms: tStellar,
+        database_ms: tDatabase,
+      },
+    });
+
+    console.log(`[Oracle] Response size: ${formatBytes(responseBody.length)}`);
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        reading_id: readingId,
-        data_hash: auth.dataHash,
-        blockchain: {
-          success: stellarResult.success,
-          tx_hash: stellarResult.txHash || null,
-          error: stellarResult.error || null,
-        },
-      }),
+      responseBody,
       { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("[Oracle] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    logSummary(requestId, timings, Date.now() - requestStart);
     return new Response(
       JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
