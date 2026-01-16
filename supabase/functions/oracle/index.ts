@@ -18,29 +18,18 @@ function formatBytes(bytes: number): string {
 }
 
 function logStep(step: number, name: string, timeMs: number, details?: Record<string, unknown>) {
-  console.log(`┌─ STEP ${step}: ${name} ${"─".repeat(Math.max(0, 40 - name.length))}┐`);
-  console.log(`│ Time: ${formatMs(timeMs)} ms`);
-  if (details) {
-    for (const [key, value] of Object.entries(details)) {
-      console.log(`│ ${key}: ${value}`);
-    }
-  }
-  console.log(`└${"─".repeat(50)}┘`);
+  const detailsStr = details
+    ? " | " + Object.entries(details).map(([k, v]) => `${k}: ${v}`).join(" | ")
+    : "";
+  console.log(`[Step ${step}] ${name} (${formatMs(timeMs)} ms)${detailsStr}`);
 }
 
 function logSummary(requestId: string, steps: { name: string; time: number }[], totalTime: number) {
-  console.log(`\n╔══════════════════════════════════════════════════════════╗`);
-  console.log(`║ REQUEST SUMMARY: ${requestId}`);
-  console.log(`╠══════════════════════════════════════════════════════════╣`);
-
+  console.log(`[Summary] Request ${requestId} - Total: ${formatMs(totalTime)} ms`);
   for (const step of steps) {
     const pct = ((step.time / totalTime) * 100).toFixed(1);
-    console.log(`║ ${step.name.padEnd(25)} ${formatMs(step.time).padStart(8)} ms (${pct.padStart(5)}%)`);
+    console.log(`  ${step.name}: ${formatMs(step.time)} ms (${pct}%)`);
   }
-
-  console.log(`╠══════════════════════════════════════════════════════════╣`);
-  console.log(`║ TOTAL                     ${formatMs(totalTime).padStart(8)} ms`);
-  console.log(`╚══════════════════════════════════════════════════════════╝\n`);
 }
 
 // ============================================================================
@@ -105,6 +94,72 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+/**
+ * Convert DER-encoded ECDSA signature to IEEE P1363 format (r||s)
+ * Web Crypto API expects P1363 format, but mbedTLS/OpenSSL produce DER format
+ */
+function derToP1363(derSignature: Uint8Array): Uint8Array {
+  // DER format: 0x30 [total-len] 0x02 [r-len] [r] 0x02 [s-len] [s]
+  // P1363 format: [r (32 bytes)] [s (32 bytes)] for P-256
+
+  let offset = 0;
+
+  // Check SEQUENCE tag (0x30)
+  if (derSignature[offset++] !== 0x30) {
+    throw new Error("Invalid DER signature: missing SEQUENCE tag");
+  }
+
+  // Skip total length (1 or 2 bytes)
+  let totalLen = derSignature[offset++];
+  if (totalLen & 0x80) {
+    offset += (totalLen & 0x7f); // Skip extended length bytes
+  }
+
+  // Parse R
+  if (derSignature[offset++] !== 0x02) {
+    throw new Error("Invalid DER signature: missing INTEGER tag for R");
+  }
+  let rLen = derSignature[offset++];
+  let rStart = offset;
+  offset += rLen;
+
+  // Parse S
+  if (derSignature[offset++] !== 0x02) {
+    throw new Error("Invalid DER signature: missing INTEGER tag for S");
+  }
+  let sLen = derSignature[offset++];
+  let sStart = offset;
+
+  // Extract R and S, padding/trimming to 32 bytes each
+  const r = extractInteger(derSignature, rStart, rLen, 32);
+  const s = extractInteger(derSignature, sStart, sLen, 32);
+
+  // Concatenate r || s
+  const p1363 = new Uint8Array(64);
+  p1363.set(r, 0);
+  p1363.set(s, 32);
+
+  return p1363;
+}
+
+function extractInteger(data: Uint8Array, start: number, len: number, targetLen: number): Uint8Array {
+  const result = new Uint8Array(targetLen);
+
+  // Skip leading zeros if integer is longer than target
+  let srcOffset = start;
+  let srcLen = len;
+  while (srcLen > targetLen && data[srcOffset] === 0) {
+    srcOffset++;
+    srcLen--;
+  }
+
+  // Copy to result, right-aligned (pad with zeros on left if needed)
+  const destOffset = targetLen - srcLen;
+  result.set(data.slice(srcOffset, srcOffset + srcLen), destOffset > 0 ? destOffset : 0);
+
+  return result;
+}
+
 async function verifyDeviceSignature(
   supabase: ReturnType<typeof createClient>,
   payload: string,
@@ -145,9 +200,12 @@ async function verifyDeviceSignature(
     }
   }
 
-  // 3. Verify hash matches payload
-  const payloadObj = JSON.parse(payload);
-  const expectedHash = await generateHash(payloadObj);
+  // 3. Verify hash matches payload (use raw string, not re-serialized JSON)
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(payload));
+  const expectedHash = Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
   console.log("[Auth] Expected hash:", expectedHash.substring(0, 16) + "...");
   console.log("[Auth] Received hash:", auth.dataHash.substring(0, 16) + "...");
 
@@ -176,13 +234,13 @@ async function verifyDeviceSignature(
   try {
     console.log("[Auth] Verifying ECDSA signature...");
 
-    // Decode base64 signature
-    const signatureBytes = Uint8Array.from(atob(auth.signature), c => c.charCodeAt(0));
+    // Decode base64 signature (DER format from mbedTLS/OpenSSL)
+    const derSignature = Uint8Array.from(atob(auth.signature), c => c.charCodeAt(0));
+    console.log("[Auth] DER signature length:", derSignature.length, "bytes");
 
-    // Convert hex hash to bytes
-    const hashBytes = new Uint8Array(
-      auth.dataHash.match(/.{2}/g)!.map(b => parseInt(b, 16))
-    );
+    // Convert DER to P1363 format (required by Web Crypto API)
+    const signatureBytes = derToP1363(derSignature);
+    console.log("[Auth] P1363 signature length:", signatureBytes.length, "bytes");
 
     // Import public key
     const publicKey = await crypto.subtle.importKey(
@@ -193,12 +251,17 @@ async function verifyDeviceSignature(
       ["verify"]
     );
 
-    // Verify signature
+    // Web Crypto verify() hashes the data internally with SHA-256
+    // So we pass the original payload, not the pre-computed hash
+    const encoder = new TextEncoder();
+    const payloadBytes = encoder.encode(payload);
+
+    // Verify signature (P1363 format, data will be hashed internally)
     const isValid = await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       publicKey,
       signatureBytes,
-      hashBytes
+      payloadBytes
     );
 
     if (!isValid) {
@@ -455,14 +518,9 @@ serve(async (req: Request) => {
     );
   }
 
-  console.log(`\n╔══════════════════════════════════════════════════════════╗`);
-  console.log(`║ REQUEST #${requestId} - ${new Date().toISOString()}`);
-  console.log(`╚══════════════════════════════════════════════════════════╝`);
+  console.log(`[Oracle] Request #${requestId} - ${new Date().toISOString()}`);
 
   try {
-    // ─────────────────────────────────────────────────────────────
-    // STEP 0: Read and parse body
-    // ─────────────────────────────────────────────────────────────
     const t0 = Date.now();
     const bodyText = await req.text();
     const body = JSON.parse(bodyText);
@@ -479,9 +537,7 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // ─────────────────────────────────────────────────────────────
     // STEP 1: Authenticate device (ECDSA signature verification)
-    // ─────────────────────────────────────────────────────────────
     const t1 = Date.now();
     const auth = extractAuthHeaders(req);
     const authResult = await verifyDeviceSignature(supabase, bodyText, auth);
@@ -504,9 +560,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // ─────────────────────────────────────────────────────────────
     // STEP 2: Validate payload
-    // ─────────────────────────────────────────────────────────────
     const t2 = Date.now();
     const validation = validate(body);
     const tValidate = Date.now() - t2;
@@ -525,9 +579,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // ─────────────────────────────────────────────────────────────
     // STEP 3: Normalize
-    // ─────────────────────────────────────────────────────────────
     const t3 = Date.now();
     const normalized = await normalize(validation.data!);
     const tNormalize = Date.now() - t3;
@@ -540,9 +592,7 @@ serve(async (req: Request) => {
       "Luminosity": normalized.luminosity !== null ? `${normalized.luminosity} lux` : "N/A",
     });
 
-    // ─────────────────────────────────────────────────────────────
     // STEP 4: Record on Stellar using IoT's hash
-    // ─────────────────────────────────────────────────────────────
     const t4 = Date.now();
     const stellarResult = await recordOnStellar(auth.dataHash!, normalized.timestamp);
     const tStellar = Date.now() - t4;
@@ -554,9 +604,7 @@ serve(async (req: Request) => {
       "Error": stellarResult.error || "None",
     });
 
-    // ─────────────────────────────────────────────────────────────
     // STEP 5: Save to database
-    // ─────────────────────────────────────────────────────────────
     const t5 = Date.now();
     const readingId = await saveToDatabase(
       supabase,
@@ -573,9 +621,7 @@ serve(async (req: Request) => {
       "Blockchain Status": stellarResult.success ? "confirmed" : "failed",
     });
 
-    // ─────────────────────────────────────────────────────────────
     // SUMMARY
-    // ─────────────────────────────────────────────────────────────
     const totalTime = Date.now() - requestStart;
     logSummary(requestId, timings, totalTime);
 
