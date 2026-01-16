@@ -24,4 +24,10 @@ Thumbs.db
 # BMAD output (optional - uncomment if you don't want to track)
 # _bmad-output/
 
+# PlatformIO
+firmware/.pio/
+firmware/.vscode/
+firmware/include/config.h
+!firmware/include/config.example.h
+
 
