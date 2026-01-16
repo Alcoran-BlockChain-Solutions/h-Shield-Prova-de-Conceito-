@@ -23,19 +23,21 @@ static bool initialized = false;
 void init() {
     if (initialized) return;
 
+    unsigned long startTotal = millis();
+
     DEBUG_PRINTLN("[Crypto] ========================================");
     DEBUG_PRINTLN("[Crypto] Initializing ECDSA module...");
     DEBUG_PRINTLN("[Crypto] ========================================");
 
     // Initialize contexts
-    DEBUG_PRINTLN("[Crypto] Initializing mbedTLS contexts...");
+    unsigned long t0 = millis();
     mbedtls_pk_init(&pk);
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
-    DEBUG_PRINTLN("[Crypto] Contexts initialized");
+    DEBUG_PRINTF("[Crypto] Context init: %lu ms\n", millis() - t0);
 
     // Seed the random number generator
-    DEBUG_PRINTLN("[Crypto] Seeding RNG...");
+    t0 = millis();
     const char* pers = "harvestshield_ecdsa";
     int ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
                                     (const unsigned char*)pers, strlen(pers));
@@ -45,39 +47,37 @@ void init() {
         Serial.printf("[Crypto] ERROR: Failed to seed RNG: %s\n", error_buf);
         return;
     }
-    DEBUG_PRINTLN("[Crypto] RNG seeded successfully");
+    DEBUG_PRINTF("[Crypto] RNG seed: %lu ms\n", millis() - t0);
 
     // Parse the private key from config.h
-    DEBUG_PRINTLN("[Crypto] Parsing private key...");
-    DEBUG_PRINTF("[Crypto] Key length: %d bytes\n", strlen(DEVICE_PRIVATE_KEY));
-
+    t0 = millis();
+    size_t keyLen = strlen(DEVICE_PRIVATE_KEY);
     ret = mbedtls_pk_parse_key(&pk,
         (const unsigned char*)DEVICE_PRIVATE_KEY,
-        strlen(DEVICE_PRIVATE_KEY) + 1,
+        keyLen + 1,
         NULL, 0);
 
     if (ret != 0) {
         char error_buf[100];
         mbedtls_strerror(ret, error_buf, sizeof(error_buf));
-        Serial.printf("[Crypto] ERROR: Failed to parse private key: %s (code: -0x%04x)\n", error_buf, -ret);
+        Serial.printf("[Crypto] ERROR: Failed to parse key: %s (code: -0x%04x)\n", error_buf, -ret);
         return;
     }
-    DEBUG_PRINTLN("[Crypto] Private key parsed successfully");
+    DEBUG_PRINTF("[Crypto] Key parse: %lu ms (key size: %d bytes)\n", millis() - t0, keyLen);
 
     // Verify it's an EC key
-    DEBUG_PRINTLN("[Crypto] Verifying key type...");
     if (!mbedtls_pk_can_do(&pk, MBEDTLS_PK_ECDSA)) {
         Serial.println("[Crypto] ERROR: Key is not ECDSA!");
         return;
     }
 
     const char* key_name = mbedtls_pk_get_name(&pk);
-    DEBUG_PRINTF("[Crypto] Key type: %s\n", key_name);
-    DEBUG_PRINTF("[Crypto] Key size: %d bits\n", (int)mbedtls_pk_get_bitlen(&pk));
+    int key_bits = (int)mbedtls_pk_get_bitlen(&pk);
+    DEBUG_PRINTF("[Crypto] Key type: %s, %d bits\n", key_name, key_bits);
 
     initialized = true;
     DEBUG_PRINTLN("[Crypto] ========================================");
-    DEBUG_PRINTLN("[Crypto] ECDSA initialized successfully!");
+    DEBUG_PRINTF("[Crypto] INIT COMPLETE - Total: %lu ms\n", millis() - startTotal);
     DEBUG_PRINTLN("[Crypto] ========================================");
 }
 
@@ -86,15 +86,11 @@ bool isInitialized() {
 }
 
 String sha256(const char* data) {
-    DEBUG_PRINTLN("[Crypto] ----------------------------------------");
-    DEBUG_PRINTLN("[Crypto] Computing SHA256 hash...");
-    DEBUG_PRINTF("[Crypto] Input length: %d bytes\n", strlen(data));
-    DEBUG_PRINTF("[Crypto] Input preview: %.50s...\n", data);
+    unsigned long t0 = millis();
+    size_t inputLen = strlen(data);
 
     unsigned char hash[32];
-
-    // Compute SHA-256 (void function in ESP32's mbedtls)
-    mbedtls_sha256((const unsigned char*)data, strlen(data), hash, 0);
+    mbedtls_sha256((const unsigned char*)data, inputLen, hash, 0);
 
     // Convert to hex string
     char hex[65];
@@ -103,24 +99,21 @@ String sha256(const char* data) {
     }
     hex[64] = '\0';
 
-    DEBUG_PRINTF("[Crypto] SHA256 hash: %s\n", hex);
-    DEBUG_PRINTLN("[Crypto] ----------------------------------------");
+    unsigned long elapsed = millis() - t0;
+    DEBUG_PRINTF("[Crypto] SHA256: %lu ms | in: %d bytes -> out: 64 chars\n", elapsed, inputLen);
 
     return String(hex);
 }
 
 String sign(const char* hexHash) {
-    DEBUG_PRINTLN("[Crypto] ----------------------------------------");
-    DEBUG_PRINTLN("[Crypto] Signing hash with ECDSA...");
-    DEBUG_PRINTF("[Crypto] Hash to sign: %s\n", hexHash);
-
     if (!initialized) {
         Serial.println("[Crypto] ERROR: Not initialized!");
         return "";
     }
 
+    unsigned long t0 = millis();
+
     // Convert hex hash string to bytes
-    DEBUG_PRINTLN("[Crypto] Converting hex hash to bytes...");
     unsigned char hashBytes[32];
     for (int i = 0; i < 32; i++) {
         unsigned int byte;
@@ -128,8 +121,10 @@ String sign(const char* hexHash) {
         hashBytes[i] = (unsigned char)byte;
     }
 
+    unsigned long tConvert = millis() - t0;
+
     // Sign the hash
-    DEBUG_PRINTLN("[Crypto] Calling mbedtls_pk_sign...");
+    unsigned long tSignStart = millis();
     unsigned char sig[MBEDTLS_PK_SIGNATURE_MAX_SIZE];
     size_t sig_len = 0;
 
@@ -145,10 +140,10 @@ String sign(const char* hexHash) {
         return "";
     }
 
-    DEBUG_PRINTF("[Crypto] Signature length: %d bytes\n", sig_len);
+    unsigned long tSign = millis() - tSignStart;
 
     // Base64 encode the signature
-    DEBUG_PRINTLN("[Crypto] Base64 encoding signature...");
+    unsigned long tB64Start = millis();
     unsigned char base64[256];
     size_t base64_len = 0;
 
@@ -157,13 +152,14 @@ String sign(const char* hexHash) {
         Serial.printf("[Crypto] ERROR: Base64 encode failed: %d\n", ret);
         return "";
     }
-
     base64[base64_len] = '\0';
 
-    DEBUG_PRINTF("[Crypto] Base64 signature: %s\n", (char*)base64);
-    DEBUG_PRINTF("[Crypto] Base64 length: %d chars\n", base64_len);
-    DEBUG_PRINTLN("[Crypto] Signing complete!");
-    DEBUG_PRINTLN("[Crypto] ----------------------------------------");
+    unsigned long tB64 = millis() - tB64Start;
+    unsigned long tTotal = millis() - t0;
+
+    DEBUG_PRINTF("[Crypto] ECDSA Sign: %lu ms | convert: %lu ms, sign: %lu ms, b64: %lu ms\n",
+                 tTotal, tConvert, tSign, tB64);
+    DEBUG_PRINTF("[Crypto] Signature: %d bytes DER -> %d chars base64\n", sig_len, base64_len);
 
     return String((char*)base64);
 }
