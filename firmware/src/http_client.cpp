@@ -18,6 +18,10 @@ void sendReading(const char* device_id, const SensorReading& reading) {
     StatsManager::incrementTotal();
     Stats& stats = StatsManager::get();
 
+    // ===== REQUEST START =====
+    Serial.println();
+    Serial.printf(">>> REQUEST #%lu ========================================\n", stats.total);
+
     unsigned long tStart = millis();
     Led::on();
 
@@ -83,6 +87,7 @@ void sendReading(const char* device_id, const SensorReading& reading) {
         stats.total, tJson, tHash, tSign, tHttp, tTotal);
 
     // Process response
+    const char* result;
     if (httpCode == 200 || httpCode == 201 || httpCode == 202) {
         StatsManager::incrementSuccess();
 
@@ -96,19 +101,26 @@ void sendReading(const char* device_id, const SensorReading& reading) {
             int hashStart = response.indexOf("\"tx_hash\":\"") + 11;
             int hashEnd = response.indexOf("\"", hashStart);
             String txHash = response.substring(hashStart, hashEnd);
-            Serial.printf("[IoT] #%lu OK + TX: %.16s...\n", stats.total, txHash.c_str());
+            Serial.printf("    TX: %.16s...\n", txHash.c_str());
+            result = "OK + BLOCKCHAIN";
         } else if (isPending || httpCode == 202) {
             StatsManager::incrementBlockchainSuccess();
             Led::success();
+            result = "OK (pending)";
         } else {
             StatsManager::incrementBlockchainFailed();
             Led::success();
+            result = "OK (no blockchain)";
         }
     } else {
         StatsManager::incrementFailed();
         Led::error();
-        Serial.printf("[IoT] #%lu FAIL HTTP %d\n", stats.total, httpCode);
+        result = "FAILED";
+        Serial.printf("    HTTP Error: %d\n", httpCode);
     }
+
+    // ===== REQUEST END =====
+    Serial.printf("<<< #%lu | %s | %lums ============================\n", stats.total, result, tTotal);
 
     if (stats.total % 60 == 0) {
         StatsManager::print();
