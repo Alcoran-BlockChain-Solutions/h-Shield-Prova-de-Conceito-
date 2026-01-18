@@ -18,94 +18,49 @@ void sendReading(const char* device_id, const SensorReading& reading) {
     StatsManager::incrementTotal();
     Stats& stats = StatsManager::get();
 
-    unsigned long tRequestStart = millis();
-
-    DEBUG_PRINTLN("");
-    DEBUG_PRINTLN("╔══════════════════════════════════════════════════════════╗");
-    DEBUG_PRINTF("║ REQUEST #%lu\n", stats.total);
-    DEBUG_PRINTLN("╚══════════════════════════════════════════════════════════╝");
-
+    unsigned long tStart = millis();
     Led::on();
 
-    // ─────────────────────────────────────────────────────────────
-    // STEP 1: Build JSON payload
-    // ─────────────────────────────────────────────────────────────
-    unsigned long t1 = millis();
-
+    // 1. Build JSON
+    unsigned long t = millis();
     unsigned long timestamp = millis() / 1000;
     char json[300];
-    int jsonLen = snprintf(json, sizeof(json),
+    snprintf(json, sizeof(json),
         "{\"device_id\":\"%s\",\"temperature\":%.2f,\"humidity_air\":%.2f,\"humidity_soil\":%.2f,\"luminosity\":%d,\"timestamp\":%lu}",
         device_id, reading.temperature, reading.humidity_air, reading.humidity_soil, reading.luminosity, timestamp);
+    unsigned long tJson = millis() - t;
 
-    unsigned long tBuildJson = millis() - t1;
-
-    DEBUG_PRINTLN("┌─ STEP 1: Build JSON ─────────────────────────────────────┐");
-    DEBUG_PRINTF("│ Time: %lu ms\n", tBuildJson);
-    DEBUG_PRINTF("│ Size: %d bytes\n", jsonLen);
-    DEBUG_PRINTF("│ JSON: %.60s...\n", json);
-    DEBUG_PRINTLN("└──────────────────────────────────────────────────────────┘");
-
-    // ─────────────────────────────────────────────────────────────
-    // STEP 2: Compute SHA256 hash
-    // ─────────────────────────────────────────────────────────────
-    unsigned long t2 = millis();
+    // 2. SHA256
+    t = millis();
     String dataHash = Crypto::sha256(json);
-    unsigned long tHash = millis() - t2;
+    unsigned long tHash = millis() - t;
 
     if (dataHash.isEmpty()) {
-        Serial.println("[HTTP] ERROR: Failed to generate hash!");
+        Serial.println("[IoT] Hash FAIL");
         Led::error();
         StatsManager::incrementFailed();
         return;
     }
 
-    DEBUG_PRINTLN("┌─ STEP 2: SHA256 Hash ────────────────────────────────────┐");
-    DEBUG_PRINTF("│ Time: %lu ms\n", tHash);
-    DEBUG_PRINTF("│ Input: %d bytes -> Output: %d chars\n", jsonLen, dataHash.length());
-    DEBUG_PRINTF("│ Hash: %s\n", dataHash.c_str());
-    DEBUG_PRINTLN("└──────────────────────────────────────────────────────────┘");
-
-    // ─────────────────────────────────────────────────────────────
-    // STEP 3: Sign hash with ECDSA
-    // ─────────────────────────────────────────────────────────────
-    unsigned long t3 = millis();
+    // 3. ECDSA Sign
+    t = millis();
     String signature = Crypto::sign(dataHash.c_str());
-    unsigned long tSign = millis() - t3;
+    unsigned long tSign = millis() - t;
 
     if (signature.isEmpty()) {
-        Serial.println("[HTTP] ERROR: Failed to sign payload!");
+        Serial.println("[IoT] Sign FAIL");
         Led::error();
         StatsManager::incrementFailed();
         return;
     }
 
-    DEBUG_PRINTLN("┌─ STEP 3: ECDSA Signature ────────────────────────────────┐");
-    DEBUG_PRINTF("│ Time: %lu ms\n", tSign);
-    DEBUG_PRINTF("│ Input: 64 chars (hash) -> Output: %d chars (base64)\n", signature.length());
-    DEBUG_PRINTF("│ Sig: %.50s...\n", signature.c_str());
-    DEBUG_PRINTLN("└──────────────────────────────────────────────────────────┘");
-
-    // ─────────────────────────────────────────────────────────────
-    // STEP 4: HTTP POST request
-    // ─────────────────────────────────────────────────────────────
+    // 4. HTTP POST
     char url[256];
     snprintf(url, sizeof(url), "%s/oracle", SUPABASE_URL);
-
-    // Calculate total request size (headers + body)
-    int headerSize = strlen(device_id) + dataHash.length() + signature.length() + 100; // approx
-
-    DEBUG_PRINTLN("┌─ STEP 4: HTTP POST ──────────────────────────────────────┐");
-    DEBUG_PRINTF("│ URL: %s\n", url);
-    DEBUG_PRINTF("│ Body size: %d bytes\n", jsonLen);
-    DEBUG_PRINTF("│ Headers size: ~%d bytes\n", headerSize);
-    DEBUG_PRINTF("│ Total payload: ~%d bytes\n", jsonLen + headerSize);
 
     HTTPClient http;
     http.begin(url);
     http.setTimeout(HTTP_TIMEOUT_MS);
-
-    // Headers
     http.addHeader("Content-Type", "application/json");
     http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
     http.addHeader("X-Device-ID", device_id);
@@ -113,83 +68,51 @@ void sendReading(const char* device_id, const SensorReading& reading) {
     http.addHeader("X-Signature", signature);
     http.addHeader("X-Timestamp", String(timestamp));
 
-    unsigned long t4 = millis();
+    t = millis();
     int httpCode = http.POST(json);
-    unsigned long tHttp = millis() - t4;
+    unsigned long tHttp = millis() - t;
 
     String response = http.getString();
     http.end();
-
     Led::off();
 
-    DEBUG_PRINTF("│ HTTP Time: %lu ms\n", tHttp);
-    DEBUG_PRINTF("│ HTTP Code: %d\n", httpCode);
-    DEBUG_PRINTF("│ Response size: %d bytes\n", response.length());
-    DEBUG_PRINTLN("└──────────────────────────────────────────────────────────┘");
+    unsigned long tTotal = millis() - tStart;
 
-    // ─────────────────────────────────────────────────────────────
-    // SUMMARY
-    // ─────────────────────────────────────────────────────────────
-    unsigned long tTotal = millis() - tRequestStart;
+    // Log: etapa e tempo
+    Serial.printf("[IoT] #%lu | JSON:%lu Hash:%lu Sign:%lu HTTP:%lu | Total:%lums\n",
+        stats.total, tJson, tHash, tSign, tHttp, tTotal);
 
-    DEBUG_PRINTLN("┌─ SUMMARY ────────────────────────────────────────────────┐");
-    DEBUG_PRINTF("│ 1. Build JSON:    %4lu ms\n", tBuildJson);
-    DEBUG_PRINTF("│ 2. SHA256 Hash:   %4lu ms\n", tHash);
-    DEBUG_PRINTF("│ 3. ECDSA Sign:    %4lu ms\n", tSign);
-    DEBUG_PRINTF("│ 4. HTTP Request:  %4lu ms\n", tHttp);
-    DEBUG_PRINTLN("│ ──────────────────────────────────");
-    DEBUG_PRINTF("│ TOTAL:            %4lu ms\n", tTotal);
-    DEBUG_PRINTLN("│");
-    DEBUG_PRINTF("│ Crypto overhead:  %4lu ms (%.1f%%)\n", tHash + tSign, 100.0 * (tHash + tSign) / tTotal);
-    DEBUG_PRINTF("│ Network time:     %4lu ms (%.1f%%)\n", tHttp, 100.0 * tHttp / tTotal);
-    DEBUG_PRINTLN("└──────────────────────────────────────────────────────────┘");
-
-    // ─────────────────────────────────────────────────────────────
     // Process response
-    // ─────────────────────────────────────────────────────────────
-    // 200 = OK, 201 = Created, 202 = Accepted (RF11 async mode)
     if (httpCode == 200 || httpCode == 201 || httpCode == 202) {
         StatsManager::incrementSuccess();
 
-        // Check for blockchain result in response
-        // - Sync mode (201): has "tx_hash" with actual hash
-        // - Async mode (202): has "status":"pending" (blockchain processing in background)
         bool hasBlockchainTx = response.indexOf("\"tx_hash\":\"") > 0 &&
                                response.indexOf("\"tx_hash\":null") < 0;
         bool isPending = response.indexOf("\"status\":\"pending\"") > 0;
 
         if (hasBlockchainTx) {
-            // Sync mode: blockchain TX completed
             StatsManager::incrementBlockchainSuccess();
             Led::successBlockchain();
-
             int hashStart = response.indexOf("\"tx_hash\":\"") + 11;
             int hashEnd = response.indexOf("\"", hashStart);
             String txHash = response.substring(hashStart, hashEnd);
-            Serial.printf("[%04lu] OK + blockchain: %.16s... (%lu ms)\n", stats.total, txHash.c_str(), tTotal);
+            Serial.printf("[IoT] #%lu OK + TX: %.16s...\n", stats.total, txHash.c_str());
         } else if (isPending || httpCode == 202) {
-            // Async mode (RF11): accepted, blockchain will process in background
-            StatsManager::incrementBlockchainSuccess(); // Count as success (will be processed)
+            StatsManager::incrementBlockchainSuccess();
             Led::success();
-            Serial.printf("[%04lu] OK (blockchain pending) (%lu ms)\n", stats.total, tTotal);
         } else {
-            // Response indicates blockchain failed
             StatsManager::incrementBlockchainFailed();
             Led::success();
-            Serial.printf("[%04lu] OK (blockchain failed) (%lu ms)\n", stats.total, tTotal);
         }
     } else {
         StatsManager::incrementFailed();
         Led::error();
-        Serial.printf("[%04lu] FAILED: HTTP %d (%lu ms)\n", stats.total, httpCode, tTotal);
-        DEBUG_PRINTF("[HTTP] Error response: %s\n", response.c_str());
+        Serial.printf("[IoT] #%lu FAIL HTTP %d\n", stats.total, httpCode);
     }
 
     if (stats.total % 60 == 0) {
         StatsManager::print();
     }
-
-    DEBUG_PRINTLN("");
 }
 
 } // namespace HttpClient

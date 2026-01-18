@@ -9,28 +9,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // LOGGING UTILITIES
 // ============================================================================
 
-function formatMs(ms: number): string {
-  return ms.toFixed(2);
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  return `${(bytes / 1024).toFixed(2)} KB`;
-}
-
-function logStep(step: number, name: string, timeMs: number, details?: Record<string, unknown>) {
-  const detailsStr = details
-    ? " | " + Object.entries(details).map(([k, v]) => `${k}: ${v}`).join(" | ")
-    : "";
-  console.log(`[Step ${step}] ${name} (${formatMs(timeMs)} ms)${detailsStr}`);
-}
-
-function logSummary(requestId: string, steps: { name: string; time: number }[], totalTime: number) {
-  console.log(`[Summary] Request ${requestId} - Total: ${formatMs(totalTime)} ms`);
-  for (const step of steps) {
-    const pct = ((step.time / totalTime) * 100).toFixed(1);
-    console.log(`  ${step.name}: ${formatMs(step.time)} ms (${pct}%)`);
-  }
+function log(step: string, timeMs?: number) {
+  const timeStr = timeMs !== undefined ? ` (${timeMs}ms)` : "";
+  console.log(`[API] ${step}${timeStr}`);
 }
 
 // ============================================================================
@@ -166,11 +147,6 @@ async function verifyDeviceSignature(
   payload: string,
   auth: AuthHeaders
 ): Promise<{ valid: boolean; error?: string }> {
-  console.log("[Auth] Starting device verification...");
-  console.log("[Auth] Device ID:", auth.deviceId);
-  console.log("[Auth] Has signature:", !!auth.signature);
-  console.log("[Auth] Has data hash:", !!auth.dataHash);
-
   // 1. Check required headers
   if (!auth.deviceId || !auth.signature || !auth.dataHash) {
     return { valid: false, error: "Missing authentication headers (X-Device-ID, X-Signature, X-Data-Hash)" };
@@ -178,7 +154,6 @@ async function verifyDeviceSignature(
 
   // 2. Anti-replay check (configurable via ENV)
   const enableAntiReplay = Deno.env.get("ENABLE_ANTI_REPLAY") === "true";
-  console.log("[Auth] Anti-replay enabled:", enableAntiReplay);
 
   if (enableAntiReplay) {
     if (!auth.timestamp) {
@@ -194,21 +169,17 @@ async function verifyDeviceSignature(
     }
 
     const age = Math.abs(now - msgTime);
-    console.log("[Auth] Timestamp age:", age, "seconds, max:", maxAge);
-
     if (age > maxAge) {
       return { valid: false, error: `Timestamp expired (age: ${age}s, max: ${maxAge}s)` };
     }
   }
 
-  // 3. Verify hash matches payload (use raw string, not re-serialized JSON)
+  // 3. Verify hash matches payload
   const encoder = new TextEncoder();
   const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(payload));
   const expectedHash = Array.from(new Uint8Array(hashBuffer))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  console.log("[Auth] Expected hash:", expectedHash.substring(0, 16) + "...");
-  console.log("[Auth] Received hash:", auth.dataHash.substring(0, 16) + "...");
 
   if (auth.dataHash !== expectedHash) {
     return { valid: false, error: "Data hash mismatch - payload may have been tampered" };
@@ -222,28 +193,18 @@ async function verifyDeviceSignature(
     .single();
 
   if (dbError || !device) {
-    console.log("[Auth] Device not found:", auth.deviceId);
     return { valid: false, error: "Unknown device" };
   }
 
   if (!device.active) {
-    console.log("[Auth] Device deactivated:", auth.deviceId);
     return { valid: false, error: "Device deactivated" };
   }
 
   // 5. Verify ECDSA signature
   try {
-    console.log("[Auth] Verifying ECDSA signature...");
-
-    // Decode base64 signature (DER format from mbedTLS/OpenSSL)
     const derSignature = Uint8Array.from(atob(auth.signature), c => c.charCodeAt(0));
-    console.log("[Auth] DER signature length:", derSignature.length, "bytes");
-
-    // Convert DER to P1363 format (required by Web Crypto API)
     const signatureBytes = derToP1363(derSignature);
-    console.log("[Auth] P1363 signature length:", signatureBytes.length, "bytes");
 
-    // Import public key
     const publicKey = await crypto.subtle.importKey(
       "spki",
       pemToArrayBuffer(device.public_key),
@@ -252,12 +213,8 @@ async function verifyDeviceSignature(
       ["verify"]
     );
 
-    // Web Crypto verify() hashes the data internally with SHA-256
-    // So we pass the original payload, not the pre-computed hash
-    const encoder = new TextEncoder();
     const payloadBytes = encoder.encode(payload);
 
-    // Verify signature (P1363 format, data will be hashed internally)
     const isValid = await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       publicKey,
@@ -266,11 +223,8 @@ async function verifyDeviceSignature(
     );
 
     if (!isValid) {
-      console.log("[Auth] Signature verification failed");
       return { valid: false, error: "Invalid signature" };
     }
-
-    console.log("[Auth] Signature verified successfully!");
 
     // 6. Update device last_seen and increment readings count
     await supabase
@@ -284,7 +238,6 @@ async function verifyDeviceSignature(
     return { valid: true };
 
   } catch (e) {
-    console.error("[Auth] Verification error:", e);
     return { valid: false, error: "Signature verification failed: " + (e instanceof Error ? e.message : "unknown error") };
   }
 }
@@ -390,30 +343,19 @@ async function recordOnStellar(
 ): Promise<{ success: boolean; txHash?: string; error?: string }> {
   const stellarSecretKey = Deno.env.get("STELLAR_SECRET_KEY");
 
-  console.log("[Stellar] Starting recordOnStellar");
-  console.log("[Stellar] Secret key configured:", !!stellarSecretKey);
-  console.log("[Stellar] Data hash to record:", dataHash.substring(0, 16) + "...");
-
   if (!stellarSecretKey) {
     return { success: false, error: "STELLAR_SECRET_KEY not configured" };
   }
 
   try {
-    // Dynamic import - use browser bundle (pure JS, no native addons)
     const StellarModule = await import("https://esm.sh/@stellar/stellar-sdk@11.2.2?bundle&target=browser");
-    // Get the default export which contains all the main classes
     const Stellar = StellarModule.default || StellarModule;
-    console.log("[Stellar] SDK loaded, keys:", Object.keys(Stellar));
 
-    // Get classes - they may be on Stellar directly or nested
     const Keypair = Stellar.Keypair || StellarModule.Keypair;
     const TransactionBuilder = Stellar.TransactionBuilder || StellarModule.TransactionBuilder;
     const Operation = Stellar.Operation || StellarModule.Operation;
     const Networks = Stellar.Networks || StellarModule.Networks;
     const HorizonServer = StellarModule.Horizon?.Server || Stellar.Horizon?.Server || Stellar.Server;
-
-    console.log("[Stellar] Classes found - Keypair:", !!Keypair, "TransactionBuilder:", !!TransactionBuilder);
-    console.log("[Stellar] HorizonServer found:", !!HorizonServer);
 
     if (!HorizonServer || !Keypair) {
       return { success: false, error: "Stellar classes not found in SDK" };
@@ -421,12 +363,7 @@ async function recordOnStellar(
 
     const server = new HorizonServer("https://horizon-testnet.stellar.org");
     const sourceKeypair = Keypair.fromSecret(stellarSecretKey);
-    console.log("[Stellar] Public key:", sourceKeypair.publicKey());
-
     const account = await server.loadAccount(sourceKeypair.publicKey());
-    console.log("[Stellar] Account loaded, sequence:", account.sequence);
-
-    // ManageData key limited to 64 bytes, value to 64 bytes
     const dataKey = `r_${timestamp}`;
 
     const transaction = new TransactionBuilder(account, {
@@ -443,14 +380,10 @@ async function recordOnStellar(
       .build();
 
     transaction.sign(sourceKeypair);
-    console.log("[Stellar] Transaction built and signed");
-
     const result = await server.submitTransaction(transaction);
-    console.log("[Stellar] Transaction submitted, hash:", result.hash);
 
     return { success: true, txHash: result.hash };
   } catch (error) {
-    console.error("[Stellar] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown Stellar error";
     return { success: false, error: errorMessage };
   }
@@ -502,7 +435,7 @@ async function updateBlockchainResult(
   readingId: string,
   stellarResult: { success: boolean; txHash?: string; error?: string }
 ): Promise<void> {
-  const { error } = await supabase
+  await supabase
     .from("readings")
     .update({
       blockchain_tx_hash: stellarResult.txHash || null,
@@ -510,12 +443,6 @@ async function updateBlockchainResult(
       blockchain_error: stellarResult.error || null,
     })
     .eq("id", readingId);
-
-  if (error) {
-    console.error(`[Stellar Background] Failed to update reading ${readingId}:`, error.message);
-  } else {
-    console.log(`[Stellar Background] Reading ${readingId} updated: ${stellarResult.success ? "confirmed" : "failed"}`);
-  }
 }
 
 // ============================================================================
@@ -531,44 +458,26 @@ async function processStellarInBackground(
   supabaseServiceKey: string,
   readingId: string,
   dataHash: string,
-  timestamp: number,
-  requestId: string
+  timestamp: number
 ): Promise<void> {
-  console.log(`[Stellar Background] Starting for reading ${readingId} (request #${requestId})`);
   const startTime = Date.now();
 
   try {
-    // Process Stellar transaction
     const stellarResult = await recordOnStellar(dataHash, timestamp);
-    const stellarTime = Date.now() - startTime;
-
-    console.log(`[Stellar Background] TX completed in ${formatMs(stellarTime)}ms - Success: ${stellarResult.success}`);
-    if (stellarResult.txHash) {
-      console.log(`[Stellar Background] TX Hash: ${stellarResult.txHash}`);
-    }
-    if (stellarResult.error) {
-      console.log(`[Stellar Background] Error: ${stellarResult.error}`);
-    }
-
-    // Update database with result
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     await updateBlockchainResult(supabase, readingId, stellarResult);
 
-    const totalTime = Date.now() - startTime;
-    console.log(`[Stellar Background] Completed for reading ${readingId} in ${formatMs(totalTime)}ms`);
+    const time = Date.now() - startTime;
+    const status = stellarResult.success ? "OK" : "FAIL";
+    log(`5. Stellar ${status}`, time);
   } catch (error) {
-    console.error(`[Stellar Background] Unexpected error for reading ${readingId}:`, error);
-
-    // Try to update DB with error status
     try {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
       await updateBlockchainResult(supabase, readingId, {
         success: false,
         error: error instanceof Error ? error.message : "Unknown background error",
       });
-    } catch (dbError) {
-      console.error(`[Stellar Background] Failed to update error status:`, dbError);
-    }
+    } catch (_) {}
   }
 }
 
@@ -578,8 +487,6 @@ async function processStellarInBackground(
 
 serve(async (req: Request) => {
   const requestStart = Date.now();
-  const requestId = crypto.randomUUID().substring(0, 8);
-  const timings: { name: string; time: number }[] = [];
 
   // CORS headers
   const corsHeaders = {
@@ -587,12 +494,10 @@ serve(async (req: Request) => {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-device-id, x-signature, x-data-hash, x-timestamp",
   };
 
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Only accept POST
   if (req.method !== "POST") {
     return new Response(
       JSON.stringify({ error: "Method not allowed" }),
@@ -600,153 +505,83 @@ serve(async (req: Request) => {
     );
   }
 
-  console.log(`[Oracle] Request #${requestId} - ${new Date().toISOString()}`);
-
   try {
-    const t0 = Date.now();
+    // 1. Parse
+    let t = Date.now();
     const bodyText = await req.text();
     const body = JSON.parse(bodyText);
-    const tParse = Date.now() - t0;
-    timings.push({ name: "Parse body", time: tParse });
+    log("1. Parse", Date.now() - t);
 
-    logStep(0, "Parse Body", tParse, {
-      "Body size": formatBytes(bodyText.length),
-      "Device ID": body.device_id || "N/A",
-    });
-
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // STEP 1: Authenticate device (ECDSA signature verification)
-    const t1 = Date.now();
+    // 2. Auth
+    t = Date.now();
     const auth = extractAuthHeaders(req);
     const authResult = await verifyDeviceSignature(supabase, bodyText, auth);
-    const tAuth = Date.now() - t1;
-    timings.push({ name: "ECDSA Auth", time: tAuth });
-
-    logStep(1, "ECDSA Authentication", tAuth, {
-      "Device ID": auth.deviceId || "N/A",
-      "Has signature": !!auth.signature,
-      "Has hash": !!auth.dataHash,
-      "Result": authResult.valid ? "VALID" : `FAILED: ${authResult.error}`,
-    });
+    const tAuth = Date.now() - t;
+    log(`2. Auth ${authResult.valid ? "OK" : "FAIL"}`, tAuth);
 
     if (!authResult.valid) {
-      console.log(`[Oracle] Authentication failed: ${authResult.error}`);
-      logSummary(requestId, timings, Date.now() - requestStart);
       return new Response(
         JSON.stringify({ success: false, error: authResult.error }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // STEP 2: Validate payload
-    const t2 = Date.now();
+    // 3. Validate
+    t = Date.now();
     const validation = validate(body);
-    const tValidate = Date.now() - t2;
-    timings.push({ name: "Validation", time: tValidate });
-
-    logStep(2, "Validate Payload", tValidate, {
-      "Valid": validation.valid,
-      "Errors": validation.errors.length > 0 ? validation.errors.join(", ") : "None",
-    });
+    log(`3. Validate ${validation.valid ? "OK" : "FAIL"}`, Date.now() - t);
 
     if (!validation.valid) {
-      logSummary(requestId, timings, Date.now() - requestStart);
       return new Response(
         JSON.stringify({ success: false, errors: validation.errors }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // STEP 3: Normalize
-    const t3 = Date.now();
+    // 4. Save DB
+    t = Date.now();
     const normalized = await normalize(validation.data!);
-    const tNormalize = Date.now() - t3;
-    timings.push({ name: "Normalization", time: tNormalize });
+    const readingId = await saveToDatabase(supabase, normalized, validation.data!, auth.dataHash!);
+    const tDatabase = Date.now() - t;
+    log("4. Database", tDatabase);
 
-    logStep(3, "Normalize Data", tNormalize, {
-      "Temp": normalized.temperature !== null ? `${normalized.temperature}°C` : "N/A",
-      "Humidity Air": normalized.humidity_air !== null ? `${normalized.humidity_air}%` : "N/A",
-      "Humidity Soil": normalized.humidity_soil !== null ? `${normalized.humidity_soil}%` : "N/A",
-      "Luminosity": normalized.luminosity !== null ? `${normalized.luminosity} lux` : "N/A",
-    });
-
-    // STEP 4: Save to database with PENDING status (RF11 - async first)
-    const t4 = Date.now();
-    const readingId = await saveToDatabase(
-      supabase,
-      normalized,
-      validation.data!,
-      auth.dataHash!
-    );
-    const tDatabase = Date.now() - t4;
-    timings.push({ name: "Database Insert", time: tDatabase });
-
-    logStep(4, "Database Insert (pending)", tDatabase, {
-      "Reading ID": readingId,
-      "Blockchain Status": "pending",
-    });
-
-    // STEP 5: Schedule Stellar TX in background using EdgeRuntime.waitUntil (RF11)
-    // This allows the response to be sent immediately while Stellar processes in background
+    // 5. Stellar (background)
     const stellarPromise = processStellarInBackground(
       supabaseUrl,
       supabaseServiceKey,
       readingId,
       auth.dataHash!,
-      normalized.timestamp,
-      requestId
+      normalized.timestamp
     );
 
-    // Use EdgeRuntime.waitUntil to keep the function alive for background processing
     // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
     if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
       // @ts-ignore
       EdgeRuntime.waitUntil(stellarPromise);
-      console.log(`[Oracle] Stellar TX scheduled in background via EdgeRuntime.waitUntil`);
     } else {
-      // Fallback: wait for Stellar (sync mode) if EdgeRuntime not available
-      console.log(`[Oracle] EdgeRuntime.waitUntil not available, falling back to sync mode`);
       await stellarPromise;
     }
 
-    // SUMMARY (response time, not including background Stellar TX)
     const totalTime = Date.now() - requestStart;
-    logSummary(requestId, timings, totalTime);
+    log(`Total: ${totalTime}ms | Device: ${auth.deviceId}`);
 
-    console.log(`[Oracle] Response time: ${formatMs(totalTime)}ms (Stellar processing in background)`);
-
-    // Build response - RF11: Return 202 Accepted immediately
-    // IoT device does NOT wait for Stellar TX
-    const responseBody = JSON.stringify({
-      success: true,
-      reading_id: readingId,
-      data_hash: auth.dataHash,
-      blockchain: {
-        status: "pending",
-        message: "Transaction queued for background processing",
-      },
-      timing: {
-        total_ms: totalTime,
-        auth_ms: tAuth,
-        database_ms: tDatabase,
-      },
-    });
-
-    console.log(`[Oracle] Response size: ${formatBytes(responseBody.length)}`);
-
-    // 202 Accepted = Request accepted, processing continues in background
     return new Response(
-      responseBody,
+      JSON.stringify({
+        success: true,
+        reading_id: readingId,
+        data_hash: auth.dataHash,
+        blockchain: { status: "pending" },
+        timing: { total_ms: totalTime, auth_ms: tAuth, database_ms: tDatabase },
+      }),
       { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("[Oracle] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    logSummary(requestId, timings, Date.now() - requestStart);
+    log(`Error: ${errorMessage}`);
     return new Response(
       JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
