@@ -147,23 +147,33 @@ void sendReading(const char* device_id, const SensorReading& reading) {
     // ─────────────────────────────────────────────────────────────
     // Process response
     // ─────────────────────────────────────────────────────────────
-    if (httpCode == 200 || httpCode == 201) {
+    // 200 = OK, 201 = Created, 202 = Accepted (RF11 async mode)
+    if (httpCode == 200 || httpCode == 201 || httpCode == 202) {
         StatsManager::incrementSuccess();
 
-        if (response.indexOf("\"success\":true") > 0 || response.indexOf("\"tx_hash\"") > 0) {
+        // Check for blockchain result in response
+        // - Sync mode (201): has "tx_hash" with actual hash
+        // - Async mode (202): has "status":"pending" (blockchain processing in background)
+        bool hasBlockchainTx = response.indexOf("\"tx_hash\":\"") > 0 &&
+                               response.indexOf("\"tx_hash\":null") < 0;
+        bool isPending = response.indexOf("\"status\":\"pending\"") > 0;
+
+        if (hasBlockchainTx) {
+            // Sync mode: blockchain TX completed
             StatsManager::incrementBlockchainSuccess();
             Led::successBlockchain();
 
-            int hashStart = response.indexOf("\"tx_hash\":\"");
-            if (hashStart > 0) {
-                hashStart += 11;
-                int hashEnd = response.indexOf("\"", hashStart);
-                String txHash = response.substring(hashStart, hashEnd);
-                Serial.printf("[%04lu] OK + blockchain: %.16s... (%lu ms)\n", stats.total, txHash.c_str(), tTotal);
-            } else {
-                Serial.printf("[%04lu] OK + blockchain (%lu ms)\n", stats.total, tTotal);
-            }
+            int hashStart = response.indexOf("\"tx_hash\":\"") + 11;
+            int hashEnd = response.indexOf("\"", hashStart);
+            String txHash = response.substring(hashStart, hashEnd);
+            Serial.printf("[%04lu] OK + blockchain: %.16s... (%lu ms)\n", stats.total, txHash.c_str(), tTotal);
+        } else if (isPending || httpCode == 202) {
+            // Async mode (RF11): accepted, blockchain will process in background
+            StatsManager::incrementBlockchainSuccess(); // Count as success (will be processed)
+            Led::success();
+            Serial.printf("[%04lu] OK (blockchain pending) (%lu ms)\n", stats.total, tTotal);
         } else {
+            // Response indicates blockchain failed
             StatsManager::incrementBlockchainFailed();
             Led::success();
             Serial.printf("[%04lu] OK (blockchain failed) (%lu ms)\n", stats.total, tTotal);

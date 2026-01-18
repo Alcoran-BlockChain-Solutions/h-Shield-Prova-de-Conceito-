@@ -1,6 +1,6 @@
 # 📊 PROGRESSO POR REQUISITO FUNCIONAL
 
-## Média RFs Implementados: 96% | Total (incluindo planejados): 67%
+## Média RFs Implementados: 96% | Total (incluindo planejados): 73%
 
 ┌──────┬────────────────────────────┬────────┬───────────────────────────────────┐
 │  RF  │         Descrição          │ Status │             Progresso             │
@@ -25,7 +25,7 @@
 ├──────┼────────────────────────────┼────────┼───────────────────────────────────┤
 │ RF10 │ Realtime Subscriptions     │ 📋     │ 0% (PLANEJADO)                    │
 ├──────┼────────────────────────────┼────────┼───────────────────────────────────┤
-│ RF11 │ Oracle Assíncrono (202)    │ 📋     │ 0% (PLANEJADO)                    │
+│ RF11 │ Oracle Assíncrono (202)    │ ✅     │ 100% (EdgeRuntime.waitUntil)      │
 └──────┴────────────────────────────┴────────┴───────────────────────────────────┘
 
 ---
@@ -60,7 +60,7 @@
 │                    PROGRESSO TOTAL                         │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
-│  ██████████████████████████████████████████████░░░░  ~88%  │
+│  █████████████████████████████████████████████████░░  ~92%  │
 │                                                            │
 ├────────────────────────────────────────────────────────────┤
 │  ESP32 C++    ██████████████████████████████████████ 100%  │
@@ -69,6 +69,7 @@
 │  Docs         ██████████████████████████████████████ 100%  │
 │  Auth IoT     ██████████████████████████████████████ 100%  │
 │  API REST     ██████████████████████████████████████ 100%  │
+│  Async Oracle ██████████████████████████████████████ 100%  │
 │  Testes       ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   0%  │
 └────────────────────────────────────────────────────────────┘
 
@@ -91,8 +92,6 @@
 ┌────────────┬────────────────────────────────┬─────────┬─────────────────────────────┐
 │ Prioridade │              Item              │ Esforço │         Descrição           │
 ├────────────┼────────────────────────────────┼─────────┼─────────────────────────────┤
-│ 🔴 P1      │ RF11: Oracle Async (202)       │ Médio   │ IoT não espera Stellar TX   │
-├────────────┼────────────────────────────────┼─────────┼─────────────────────────────┤
 │ 🔴 P1      │ RF09: Dashboard + Filtros      │ Médio   │ HTML para visualizar dados  │
 ├────────────┼────────────────────────────────┼─────────┼─────────────────────────────┤
 │ 🟡 P2      │ RF10: Realtime Integration     │ Baixo   │ Dashboard atualiza auto     │
@@ -106,20 +105,16 @@
 
 | Arquivo | Ação | RF |
 |---------|------|-----|
-| `/supabase/migrations/003_add_blockchain_error.sql` | Criar | RF11 |
 | `/supabase/migrations/004_enable_realtime.sql` | Criar | RF10 |
-| `/supabase/functions/oracle/index.ts` | Modificar | RF11 |
 | `/dashboard/index.html` | Criar | RF09, RF10 |
 
 ## Sequência de Implementação
 
 ```
-1. [Migration] Adicionar coluna blockchain_error
-2. [Migration] Habilitar Realtime na tabela readings
-3. [Oracle] Refatorar para 202 + EdgeRuntime.waitUntil()
-4. [Dashboard] Criar página HTML com filtros
-5. [Dashboard] Adicionar Realtime subscription
-6. [Test] Testar fluxo E2E
+1. [Migration] Habilitar Realtime na tabela readings
+2. [Dashboard] Criar página HTML com filtros
+3. [Dashboard] Adicionar Realtime subscription
+4. [Test] Testar fluxo E2E
 ```
 
 ---
@@ -129,13 +124,13 @@
 ┌──────────────────────────┬───────────┐
 │         Métrica          │   Valor   │
 ├──────────────────────────┼───────────┤
-│ Progresso Total          │ ~88%      │
+│ Progresso Total          │ ~92%      │
 ├──────────────────────────┼───────────┤
-│ RFs Completos            │ 7/11 (64%)│
+│ RFs Completos            │ 8/11 (73%)│
 ├──────────────────────────┼───────────┤
 │ RFs Parciais             │ 1/11 (9%) │
 ├──────────────────────────┼───────────┤
-│ RFs Planejados           │ 3/11 (27%)│
+│ RFs Planejados           │ 2/11 (18%)│
 └──────────────────────────┴───────────┘
 
-_Atualizado: 2026-01-16_
+_Atualizado: 2026-01-18_

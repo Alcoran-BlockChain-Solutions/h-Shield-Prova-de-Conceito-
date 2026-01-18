@@ -1,5 +1,6 @@
-// HarvestShield Oracle - Edge Function v0.11
+// HarvestShield Oracle - Edge Function v0.12
 // Receives sensor data, validates ECDSA signature, stores in DB, and records hash on Stellar
+// RF11: Async mode - Returns 202 immediately, processes Stellar in background
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -459,13 +460,15 @@ async function recordOnStellar(
 // DATABASE
 // ============================================================================
 
+/**
+ * Initial save with pending blockchain status (RF11 async)
+ */
 async function saveToDatabase(
   supabase: ReturnType<typeof createClient>,
   normalized: NormalizedReading,
   rawData: RawReading,
-  iotHash: string,
-  stellarResult: { success: boolean; txHash?: string; error?: string }
-) {
+  iotHash: string
+): Promise<string> {
   const { data, error } = await supabase
     .from("readings")
     .insert({
@@ -475,10 +478,11 @@ async function saveToDatabase(
       humidity_soil: normalized.humidity_soil,
       luminosity: normalized.luminosity,
       raw_data: rawData,
-      normalized_hash: iotHash, // Usar o hash do IoT, nao o recalculado
+      normalized_hash: iotHash,
       normalized_at: new Date(normalized.timestamp).toISOString(),
-      blockchain_tx_hash: stellarResult.txHash || null,
-      blockchain_status: stellarResult.success ? "confirmed" : "failed",
+      blockchain_tx_hash: null,
+      blockchain_status: "pending",
+      blockchain_error: null,
     })
     .select("id")
     .single();
@@ -488,6 +492,84 @@ async function saveToDatabase(
   }
 
   return data.id;
+}
+
+/**
+ * Update reading with blockchain result (RF11 async background task)
+ */
+async function updateBlockchainResult(
+  supabase: ReturnType<typeof createClient>,
+  readingId: string,
+  stellarResult: { success: boolean; txHash?: string; error?: string }
+): Promise<void> {
+  const { error } = await supabase
+    .from("readings")
+    .update({
+      blockchain_tx_hash: stellarResult.txHash || null,
+      blockchain_status: stellarResult.success ? "confirmed" : "failed",
+      blockchain_error: stellarResult.error || null,
+    })
+    .eq("id", readingId);
+
+  if (error) {
+    console.error(`[Stellar Background] Failed to update reading ${readingId}:`, error.message);
+  } else {
+    console.log(`[Stellar Background] Reading ${readingId} updated: ${stellarResult.success ? "confirmed" : "failed"}`);
+  }
+}
+
+// ============================================================================
+// STELLAR BACKGROUND TASK (RF11)
+// ============================================================================
+
+/**
+ * Process Stellar transaction in background and update DB
+ * This runs after the 202 response is sent to the IoT device
+ */
+async function processStellarInBackground(
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  readingId: string,
+  dataHash: string,
+  timestamp: number,
+  requestId: string
+): Promise<void> {
+  console.log(`[Stellar Background] Starting for reading ${readingId} (request #${requestId})`);
+  const startTime = Date.now();
+
+  try {
+    // Process Stellar transaction
+    const stellarResult = await recordOnStellar(dataHash, timestamp);
+    const stellarTime = Date.now() - startTime;
+
+    console.log(`[Stellar Background] TX completed in ${formatMs(stellarTime)}ms - Success: ${stellarResult.success}`);
+    if (stellarResult.txHash) {
+      console.log(`[Stellar Background] TX Hash: ${stellarResult.txHash}`);
+    }
+    if (stellarResult.error) {
+      console.log(`[Stellar Background] Error: ${stellarResult.error}`);
+    }
+
+    // Update database with result
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    await updateBlockchainResult(supabase, readingId, stellarResult);
+
+    const totalTime = Date.now() - startTime;
+    console.log(`[Stellar Background] Completed for reading ${readingId} in ${formatMs(totalTime)}ms`);
+  } catch (error) {
+    console.error(`[Stellar Background] Unexpected error for reading ${readingId}:`, error);
+
+    // Try to update DB with error status
+    try {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      await updateBlockchainResult(supabase, readingId, {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown background error",
+      });
+    } catch (dbError) {
+      console.error(`[Stellar Background] Failed to update error status:`, dbError);
+    }
+  }
 }
 
 // ============================================================================
@@ -592,68 +674,74 @@ serve(async (req: Request) => {
       "Luminosity": normalized.luminosity !== null ? `${normalized.luminosity} lux` : "N/A",
     });
 
-    // STEP 4: Record on Stellar using IoT's hash
+    // STEP 4: Save to database with PENDING status (RF11 - async first)
     const t4 = Date.now();
-    const stellarResult = await recordOnStellar(auth.dataHash!, normalized.timestamp);
-    const tStellar = Date.now() - t4;
-    timings.push({ name: "Stellar TX", time: tStellar });
-
-    logStep(4, "Stellar Blockchain", tStellar, {
-      "Success": stellarResult.success,
-      "TX Hash": stellarResult.txHash ? `${stellarResult.txHash.substring(0, 16)}...` : "N/A",
-      "Error": stellarResult.error || "None",
-    });
-
-    // STEP 5: Save to database
-    const t5 = Date.now();
     const readingId = await saveToDatabase(
       supabase,
       normalized,
       validation.data!,
-      auth.dataHash!, // Use IoT's hash
-      stellarResult
+      auth.dataHash!
     );
-    const tDatabase = Date.now() - t5;
+    const tDatabase = Date.now() - t4;
     timings.push({ name: "Database Insert", time: tDatabase });
 
-    logStep(5, "Database Insert", tDatabase, {
+    logStep(4, "Database Insert (pending)", tDatabase, {
       "Reading ID": readingId,
-      "Blockchain Status": stellarResult.success ? "confirmed" : "failed",
+      "Blockchain Status": "pending",
     });
 
-    // SUMMARY
+    // STEP 5: Schedule Stellar TX in background using EdgeRuntime.waitUntil (RF11)
+    // This allows the response to be sent immediately while Stellar processes in background
+    const stellarPromise = processStellarInBackground(
+      supabaseUrl,
+      supabaseServiceKey,
+      readingId,
+      auth.dataHash!,
+      normalized.timestamp,
+      requestId
+    );
+
+    // Use EdgeRuntime.waitUntil to keep the function alive for background processing
+    // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(stellarPromise);
+      console.log(`[Oracle] Stellar TX scheduled in background via EdgeRuntime.waitUntil`);
+    } else {
+      // Fallback: wait for Stellar (sync mode) if EdgeRuntime not available
+      console.log(`[Oracle] EdgeRuntime.waitUntil not available, falling back to sync mode`);
+      await stellarPromise;
+    }
+
+    // SUMMARY (response time, not including background Stellar TX)
     const totalTime = Date.now() - requestStart;
     logSummary(requestId, timings, totalTime);
 
-    // Calculate overhead percentages
-    const cryptoTime = tAuth;
-    const networkTime = tStellar;
-    const dbTime = tDatabase;
-    console.log(`[Oracle] Breakdown: Crypto ${formatMs(cryptoTime)}ms (${((cryptoTime/totalTime)*100).toFixed(1)}%) | Stellar ${formatMs(networkTime)}ms (${((networkTime/totalTime)*100).toFixed(1)}%) | DB ${formatMs(dbTime)}ms (${((dbTime/totalTime)*100).toFixed(1)}%)`);
+    console.log(`[Oracle] Response time: ${formatMs(totalTime)}ms (Stellar processing in background)`);
 
-    // Build response
+    // Build response - RF11: Return 202 Accepted immediately
+    // IoT device does NOT wait for Stellar TX
     const responseBody = JSON.stringify({
       success: true,
       reading_id: readingId,
       data_hash: auth.dataHash,
       blockchain: {
-        success: stellarResult.success,
-        tx_hash: stellarResult.txHash || null,
-        error: stellarResult.error || null,
+        status: "pending",
+        message: "Transaction queued for background processing",
       },
       timing: {
         total_ms: totalTime,
         auth_ms: tAuth,
-        stellar_ms: tStellar,
         database_ms: tDatabase,
       },
     });
 
     console.log(`[Oracle] Response size: ${formatBytes(responseBody.length)}`);
 
+    // 202 Accepted = Request accepted, processing continues in background
     return new Response(
       responseBody,
-      { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("[Oracle] Error:", error);
