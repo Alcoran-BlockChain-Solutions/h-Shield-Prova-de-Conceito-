@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useDevices } from '../hooks/useDevices'
 import { useReadings } from '../hooks/useReadings'
 import { DeviceCard } from '../components/DeviceCard'
 import { ReadingCard } from '../components/ReadingCard'
-import { ConnectionStatus } from '../components/ConnectionStatus'
 import { StellarExplorer } from '../components/StellarExplorer'
+import { getDeviceColor } from '../utils/colors'
 
 export function Dashboard() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>()
@@ -12,6 +12,15 @@ export function Dashboard() {
 
   const { devices, loading: devicesLoading, error: devicesError } = useDevices()
   const { readings, loading: readingsLoading, error: readingsError } = useReadings(selectedDeviceId)
+
+  // Create a map of device_id to color
+  const deviceColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    devices.forEach((device, index) => {
+      map.set(device.device_id, getDeviceColor(index))
+    })
+    return map
+  }, [devices])
 
   const handleDeviceClick = (deviceId: string) => {
     setSelectedDeviceId(prev => prev === deviceId ? undefined : deviceId)
@@ -27,12 +36,7 @@ export function Dashboard() {
 
   return (
     <div className="dashboard">
-      <header className="dashboard__header">
-        <h1>HarvestShield Dashboard</h1>
-        <ConnectionStatus />
-      </header>
-
-      <main className="dashboard__content">
+      <div className="dashboard__content">
         <section className="dashboard__devices">
           <h2>Dispositivos IoT</h2>
 
@@ -46,12 +50,13 @@ export function Dashboard() {
             <div className="empty-state">Nenhum dispositivo encontrado</div>
           ) : (
             <div className="device-list">
-              {devices.map(device => (
+              {devices.map((device, index) => (
                 <DeviceCard
                   key={device.id}
                   device={device}
                   isSelected={selectedDeviceId === device.device_id}
                   onClick={() => handleDeviceClick(device.device_id)}
+                  color={getDeviceColor(index)}
                 />
               ))}
             </div>
@@ -60,7 +65,7 @@ export function Dashboard() {
 
         <section className="dashboard__readings">
           <h2>
-            Leituras
+            Leituras Realtime
             {selectedDeviceId && (
               <span className="dashboard__filter">
                 {' '}({selectedDeviceId})
@@ -89,12 +94,13 @@ export function Dashboard() {
                   key={reading.id}
                   reading={reading}
                   onTransactionClick={handleTransactionClick}
+                  deviceColor={deviceColorMap.get(reading.device_id)}
                 />
               ))}
             </div>
           )}
         </section>
-      </main>
+      </div>
 
       {explorerTxHash && (
         <StellarExplorer

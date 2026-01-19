@@ -28,7 +28,8 @@ export function useDevices() {
       .order('last_seen_at', { ascending: false, nullsFirst: false })
 
     if (fetchError) {
-      setError(fetchError.message)
+      console.error('[useDevices] Erro ao buscar dispositivos:', fetchError)
+      setError('Falhou: veja os logs')
       return
     }
 

@@ -23,7 +23,8 @@ export function useReadings(deviceId?: string) {
     const { data, error: fetchError } = await query
 
     if (fetchError) {
-      setError(fetchError.message)
+      console.error('[useReadings] Erro ao buscar leituras:', fetchError)
+      setError('Falhou: veja os logs')
       return
     }
 

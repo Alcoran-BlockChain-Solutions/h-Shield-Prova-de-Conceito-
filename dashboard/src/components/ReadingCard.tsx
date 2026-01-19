@@ -2,20 +2,38 @@ import type { Reading } from '../types/reading'
 import { ReadingMetrics } from './ReadingMetrics'
 import { BlockchainStatus } from './BlockchainStatus'
 import { TransactionLink } from './TransactionLink'
+import { useRelativeTime } from '../hooks/useRelativeTime'
+import { formatFullDateTime } from '../utils/time'
 
 interface ReadingCardProps {
   reading: Reading
   onTransactionClick?: (txHash: string) => void
+  deviceColor?: string
 }
 
-export function ReadingCard({ reading, onTransactionClick }: ReadingCardProps) {
-  const createdAt = new Date(reading.created_at).toLocaleString()
+export function ReadingCard({ reading, onTransactionClick, deviceColor }: ReadingCardProps) {
+  const relativeTime = useRelativeTime(reading.created_at)
+  const fullDateTime = formatFullDateTime(reading.created_at)
 
   return (
-    <div className="reading-card">
+    <div
+      className="reading-card"
+      style={deviceColor ? { borderLeftColor: deviceColor, borderLeftWidth: '4px' } : undefined}
+    >
       <div className="reading-card__header">
-        <span className="reading-card__device">{reading.device_id}</span>
-        <span className="reading-card__time">{createdAt}</span>
+        <div className="reading-card__device-wrapper">
+          {deviceColor && (
+            <span
+              className="reading-card__color-dot"
+              style={{ backgroundColor: deviceColor }}
+            />
+          )}
+          <span className="reading-card__device">{reading.device_id}</span>
+        </div>
+        <span className="reading-card__time" data-tooltip={fullDateTime}>
+          {relativeTime}
+          <span className="reading-card__time-info">ⓘ</span>
+        </span>
       </div>
 
       <ReadingMetrics reading={reading} />

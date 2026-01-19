@@ -5,9 +5,10 @@ interface DeviceCardProps {
   device: DeviceWithStatus
   isSelected?: boolean
   onClick?: () => void
+  color?: string
 }
 
-export function DeviceCard({ device, isSelected, onClick }: DeviceCardProps) {
+export function DeviceCard({ device, isSelected, onClick, color }: DeviceCardProps) {
   const lastSeen = device.last_seen_at
     ? new Date(device.last_seen_at).toLocaleString()
     : 'Nunca'
@@ -18,9 +19,18 @@ export function DeviceCard({ device, isSelected, onClick }: DeviceCardProps) {
       onClick={onClick}
       role="button"
       tabIndex={0}
+      style={color ? { borderLeftColor: color, borderLeftWidth: '4px' } : undefined}
     >
       <div className="device-card__header">
-        <h3 className="device-card__name">{device.name || device.device_id}</h3>
+        <div className="device-card__name-wrapper">
+          {color && (
+            <span
+              className="device-card__color-dot"
+              style={{ backgroundColor: color }}
+            />
+          )}
+          <h3 className="device-card__name">{device.name || device.device_id}</h3>
+        </div>
         <DeviceStatusBadge isAlive={device.isAlive} />
       </div>
 

@@ -14,12 +14,16 @@ const STATUS_CONFIG = {
 export function BlockchainStatus({ status, error }: BlockchainStatusProps) {
   const config = STATUS_CONFIG[status]
 
+  if (error && status === 'failed') {
+    console.error('[BlockchainStatus] Erro blockchain:', error)
+  }
+
   return (
     <div className={`blockchain-status ${config.className}`}>
       <span className="blockchain-status__label">{config.label}</span>
       {error && status === 'failed' && (
         <span className="blockchain-status__error" title={error}>
-          {error.length > 30 ? `${error.slice(0, 30)}...` : error}
+          veja os logs
         </span>
       )}
     </div>
