@@ -9,7 +9,7 @@
 #include "led.h"
 #include "wifi_manager.h"
 #include "sensors.h"
-#include "http_client.h"
+#include "app_controller.h"
 #include "stats.h"
 #include "crypto.h"
 #include "time_manager.h"
@@ -55,6 +55,9 @@ void setup() {
         Serial.println("AVISO: NTP nao sincronizado, usando fallback");
     }
 
+    // Initialize AppController (after WiFi and other subsystems)
+    AppController::init();
+
     // LED - pronto para operar
     Led::blink(2, BLINK_NORMAL);
 
@@ -69,11 +72,8 @@ void loop() {
         return;  // Skip this cycle if not connected
     }
 
-    // Ler sensores
-    SensorReading reading = Sensors::read();
-
-    // Enviar leitura (usa KeyManager::getDeviceId() internamente)
-    HttpClient::sendReading(KeyManager::getDeviceId().c_str(), reading);
+    // Execute one reading cycle (sensors -> PoW -> sign -> HTTP)
+    AppController::runCycle();
 
     // Aguardar intervalo
     delay(INTERVAL_MS);

@@ -31,16 +31,4 @@ SensorReading read() {
     return reading;
 }
 
-String buildDataString(const SensorReading& reading) {
-    // Format: "temp-25.50;hum_air-60.00;hum_soil-45.00;lum-1000"
-    char buffer[128];
-    snprintf(buffer, sizeof(buffer),
-        "temp-%.2f;hum_air-%.2f;hum_soil-%.2f;lum-%d",
-        reading.temperature,
-        reading.humidity_air,
-        reading.humidity_soil,
-        reading.luminosity);
-    return String(buffer);
-}
-
 } // namespace Sensors
