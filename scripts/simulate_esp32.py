@@ -51,7 +51,7 @@ load_env()
 
 # Configuration
 DEVICE_ID = os.getenv("DEVICE_ID", "esp32-farm-001")
-INTERVAL_SECONDS = int(os.getenv("INTERVAL_SECONDS", "5"))
+INTERVAL_SECONDS = int(os.getenv("INTERVAL_SECONDS", "15"))  # 15 segundos padrão
 POW_DIFFICULTY = int(os.getenv("POW_DIFFICULTY", "3"))
 POW_PREFIX = "0" * POW_DIFFICULTY
 
@@ -192,7 +192,16 @@ def send_reading(private_key):
 
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
-            body = json.loads(response.read().decode("utf-8"))
+            status = response.status
+            # Oracle returns 202 Accepted with no body
+            if status == 202:
+                return True, {"success": True, "status": 202}, pow_time, attempts
+            # For other success codes, try to parse body
+            raw_body = response.read().decode("utf-8")
+            if raw_body:
+                body = json.loads(raw_body)
+            else:
+                body = {"success": True, "status": status}
             return True, body, pow_time, attempts
     except urllib.error.HTTPError as e:
         try:
