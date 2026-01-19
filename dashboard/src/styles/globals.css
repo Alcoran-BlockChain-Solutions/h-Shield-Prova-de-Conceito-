@@ -381,6 +381,89 @@ body {
   color: var(--color-error);
 }
 
+.blockchain-status__error-btn {
+  background: none;
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.blockchain-status__error-btn:hover {
+  background-color: var(--color-error);
+  color: white;
+}
+
+/* Error Modal */
+.error-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.error-modal__content {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.error-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.error-modal__header h3 {
+  font-size: 1.125rem;
+  color: var(--color-error);
+  margin: 0;
+}
+
+.error-modal__close {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-xs);
+  line-height: 1;
+}
+
+.error-modal__close:hover {
+  color: var(--color-text);
+}
+
+.error-modal__body {
+  padding: var(--spacing-md);
+  overflow-y: auto;
+}
+
+.error-modal__body pre {
+  background-color: var(--color-background);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  color: var(--color-text);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+}
+
 /* Transaction link button */
 .transaction-link-btn {
   display: inline-flex;
