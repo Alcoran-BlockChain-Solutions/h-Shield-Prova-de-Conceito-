@@ -144,33 +144,13 @@ CycleResult runCycle() {
         result.timing.totalMs);
 
     // 7. Process response and update stats
+    // Oracle returns 202 Accepted with no body - blockchain recording happens async
     const char* statusMsg;
     if (sendResult.ok()) {
         StatsManager::incrementSuccess();
-
-        bool hasBlockchainTx = sendResult.response.indexOf("\"tx_hash\":\"") > 0 &&
-                               sendResult.response.indexOf("\"tx_hash\":null") < 0;
-        bool isPending = sendResult.response.indexOf("\"status\":\"pending\"") > 0;
-
-        result.hasBlockchainTx = hasBlockchainTx;
-
-        if (hasBlockchainTx) {
-            StatsManager::incrementBlockchainSuccess();
-            Led::successBlockchain();
-            int hashStart = sendResult.response.indexOf("\"tx_hash\":\"") + 11;
-            int hashEnd = sendResult.response.indexOf("\"", hashStart);
-            String txHash = sendResult.response.substring(hashStart, hashEnd);
-            Serial.printf("    TX: %.16s...\n", txHash.c_str());
-            statusMsg = "OK + BLOCKCHAIN";
-        } else if (isPending || sendResult.httpCode == 202) {
-            StatsManager::incrementBlockchainSuccess();
-            Led::success();
-            statusMsg = "OK (pending)";
-        } else {
-            StatsManager::incrementBlockchainFailed();
-            Led::success();
-            statusMsg = "OK (no blockchain)";
-        }
+        StatsManager::incrementBlockchainSuccess();
+        Led::success();
+        statusMsg = "OK";
     } else {
         StatsManager::incrementFailed();
         Led::error();

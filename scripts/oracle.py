@@ -208,18 +208,26 @@ def send_reading():
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
             status = response.status
-            body = json.loads(response.read().decode("utf-8"))
 
             print(f"\n" + "=" * 70)
             print(f"RESPONSE - Status: {status}")
             print("=" * 70)
-            print(json.dumps(body, indent=2))
 
-            if body.get("success"):
-                print("\nSUCCESS! Reading accepted by oracle.")
-                if body.get("blockchain", {}).get("status") == "pending":
-                    print("Blockchain transaction is being processed in background.")
-            return body
+            # Oracle returns 202 Accepted with no body
+            if status == 202:
+                print("SUCCESS! Reading accepted by oracle.")
+                print("Blockchain transaction is being processed in background.")
+                return {"success": True, "status": 202}
+
+            # For other success codes, try to parse body
+            raw_body = response.read().decode("utf-8")
+            if raw_body:
+                body = json.loads(raw_body)
+                print(json.dumps(body, indent=2))
+                return body
+            else:
+                print("(empty body)")
+                return {"success": True, "status": status}
 
     except urllib.error.HTTPError as e:
         try:
