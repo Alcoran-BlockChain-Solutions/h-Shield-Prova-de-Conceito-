@@ -48,6 +48,33 @@ function log(step: string, timeMs?: number) {
   console.log(`[API] ${step}${timeStr}`);
 }
 
+// Retry helper with exponential backoff
+async function withRetry<T>(
+  reqId: string,
+  operation: () => Promise<T>,
+  maxRetries = 3,
+  baseDelayMs = 1000
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      const isRetryable = err instanceof Error &&
+        (err.message.includes('504') || err.message.includes('timeout') || err.message.includes('ETIMEDOUT'));
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw err;
+      }
+
+      debug(reqId, "RETRY", `Attempt ${attempt}/${maxRetries} failed, retrying in ${baseDelayMs}ms...`);
+      await new Promise(resolve => setTimeout(resolve, baseDelayMs));
+    }
+  }
+  throw lastError;
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -516,8 +543,13 @@ async function recordOnStellar(
     debug(reqId, "STELLAR", "Signing transaction...");
     transaction.sign(sourceKeypair);
 
-    debug(reqId, "STELLAR", "Submitting transaction...");
-    const result = await server.submitTransaction(transaction);
+    debug(reqId, "STELLAR", "Submitting transaction (with retry)...");
+    const result = await withRetry(
+      reqId,
+      () => server.submitTransaction(transaction),
+      3,  // max 3 tentativas
+      2000 // 2s, 4s, 8s backoff
+    );
 
     debug(reqId, "STELLAR", `SUCCESS! TX Hash: ${result.hash}`);
     return { success: true, txHash: result.hash };
