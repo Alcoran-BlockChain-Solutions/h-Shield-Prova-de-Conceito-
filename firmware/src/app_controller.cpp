@@ -42,6 +42,7 @@ CycleResult runCycle() {
 
     // Get device ID
     String deviceId = KeyManager::getDeviceId();
+    DEBUG_PRINTF("[IoT] Device ID: %s\n", deviceId.c_str());
 
     // ===== REQUEST START =====
     Serial.println();
