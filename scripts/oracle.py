@@ -246,8 +246,40 @@ def send_reading():
         return None
 
 
+def run_loop(interval_seconds: int = 15):
+    """Run continuously, sending readings every interval_seconds."""
+    print(f"\nStarting continuous mode (interval: {interval_seconds}s)")
+    print("Press Ctrl+C to stop\n")
+
+    count = 0
+    while True:
+        count += 1
+        print(f"\n{'='*70}")
+        print(f"READING #{count}")
+        print(f"{'='*70}")
+
+        result = send_reading()
+
+        if result and result.get("success"):
+            print(f"\nNext reading in {interval_seconds} seconds...")
+        else:
+            print(f"\nRetrying in {interval_seconds} seconds...")
+
+        try:
+            time.sleep(interval_seconds)
+        except KeyboardInterrupt:
+            print("\n\nStopped by user.")
+            break
+
+
 if __name__ == "__main__":
     if not HAS_CRYPTO:
         print("Please install cryptography: pip install cryptography")
     else:
-        send_reading()
+        import sys
+        if len(sys.argv) > 1 and sys.argv[1] == "--loop":
+            interval = int(sys.argv[2]) if len(sys.argv) > 2 else 15
+            run_loop(interval)
+        else:
+            send_reading()
+            print("\nTip: Use --loop [interval] to run continuously")

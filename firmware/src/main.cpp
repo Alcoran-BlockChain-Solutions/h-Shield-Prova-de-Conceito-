@@ -16,7 +16,7 @@
 #include "key_manager.h"
 
 // Configuracoes do dispositivo
-#define INTERVAL_MS 1000
+#define INTERVAL_MS 15000  // 15 segundos entre leituras
 #define SERIAL_BAUD 115200
 
 void setup() {
