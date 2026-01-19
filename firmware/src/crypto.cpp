@@ -5,6 +5,7 @@
 
 #include "crypto.h"
 #include "config.h"
+#include "key_manager.h"
 #include <mbedtls/sha256.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/entropy.h>
@@ -19,6 +20,9 @@ static mbedtls_pk_context pk;
 static mbedtls_entropy_context entropy;
 static mbedtls_ctr_drbg_context ctr_drbg;
 static bool initialized = false;
+
+// Maximum input size for PoW (to prevent buffer overflow)
+static const size_t MAX_POW_INPUT_SIZE = 500;
 
 void init() {
     if (initialized) return;
@@ -49,11 +53,19 @@ void init() {
     }
     DEBUG_PRINTF("[Crypto] RNG seed: %lu ms\n", millis() - t0);
 
-    // Parse the private key from config.h
+    // Get private key from KeyManager (NVS)
     t0 = millis();
-    size_t keyLen = strlen(DEVICE_PRIVATE_KEY);
+    String privateKey = KeyManager::getPrivateKey();
+
+    if (privateKey.length() == 0) {
+        Serial.println("[Crypto] ERROR: No private key available!");
+        Serial.println("[Crypto] Please provision a key using KeyManager::provisionKey()");
+        return;
+    }
+
+    size_t keyLen = privateKey.length();
     ret = mbedtls_pk_parse_key(&pk,
-        (const unsigned char*)DEVICE_PRIVATE_KEY,
+        (const unsigned char*)privateKey.c_str(),
         keyLen + 1,
         NULL, 0);
 
@@ -162,6 +174,73 @@ String sign(const char* hexHash) {
     DEBUG_PRINTF("[Crypto] Signature: %d bytes DER -> %d chars base64\n", sig_len, base64_len);
 
     return String((char*)base64);
+}
+
+PoWResult computePoW(const char* data, uint8_t difficulty) {
+    unsigned long t0 = millis();
+    const uint32_t MAX_ATTEMPTS = 1000000;  // Increased for higher difficulty
+
+    PoWResult result;
+    result.nonce = 0;
+    result.success = false;
+
+    // SECURITY FIX: Validate input size to prevent buffer overflow
+    size_t dataLen = strlen(data);
+    if (dataLen > MAX_POW_INPUT_SIZE) {
+        Serial.printf("[Crypto] ERROR: PoW input too large (%d > %d bytes)\n",
+                      dataLen, MAX_POW_INPUT_SIZE);
+        return result;
+    }
+
+    // Buffer sized for max data + max uint32 string (10 digits) + null
+    char input[MAX_POW_INPUT_SIZE + 12];
+
+    for (uint32_t nonce = 0; nonce < MAX_ATTEMPTS; nonce++) {
+        // Build input: data + nonce as string
+        snprintf(input, sizeof(input), "%s%u", data, nonce);
+
+        // Compute SHA256
+        unsigned char hash[32];
+        mbedtls_sha256((const unsigned char*)input, strlen(input), hash, 0);
+
+        // Check difficulty: count leading zero bytes/nibbles
+        bool valid = true;
+        for (uint8_t i = 0; i < difficulty / 2; i++) {
+            if (hash[i] != 0x00) {
+                valid = false;
+                break;
+            }
+        }
+        // Handle odd difficulty (e.g., difficulty=1 means first nibble is 0)
+        if (valid && (difficulty % 2 == 1)) {
+            if ((hash[difficulty / 2] & 0xF0) != 0x00) {
+                valid = false;
+            }
+        }
+
+        if (valid) {
+            result.nonce = nonce;
+            result.success = true;
+
+            // Convert hash to hex string
+            char hex[65];
+            for (int i = 0; i < 32; i++) {
+                sprintf(hex + (i * 2), "%02x", hash[i]);
+            }
+            hex[64] = '\0';
+            result.hash = String(hex);
+
+            unsigned long elapsed = millis() - t0;
+            DEBUG_PRINTF("[Crypto] PoW: %lu ms | nonce: %u | attempts: %u | difficulty: %d\n",
+                         elapsed, nonce, nonce + 1, difficulty);
+            return result;
+        }
+    }
+
+    unsigned long elapsed = millis() - t0;
+    Serial.printf("[Crypto] PoW FAILED: %lu ms | max attempts: %u | difficulty: %d\n",
+                  elapsed, MAX_ATTEMPTS, difficulty);
+    return result;
 }
 
 } // namespace Crypto

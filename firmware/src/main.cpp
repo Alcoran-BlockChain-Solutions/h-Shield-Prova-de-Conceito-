@@ -12,9 +12,10 @@
 #include "http_client.h"
 #include "stats.h"
 #include "crypto.h"
+#include "time_manager.h"
+#include "key_manager.h"
 
 // Configuracoes do dispositivo
-#define DEVICE_ID "esp32-farm-001"
 #define INTERVAL_MS 1000
 #define SERIAL_BAUD 115200
 
@@ -22,16 +23,19 @@ void setup() {
     Serial.begin(SERIAL_BAUD);
     delay(1000);
 
-    // Inicializar modulos
+    // Inicializar modulos (ordem importante)
     Led::init();
+    KeyManager::init();      // Carrega chave privada do NVS
     Sensors::init();
-    StatsManager::init();
+    StatsManager::init();    // Carrega stats do NVS
     Crypto::init();
 
     Serial.println("\n============================================================");
     Serial.println("ESP32 FIRMWARE - HarvestShield");
     Serial.println("============================================================");
-    Serial.printf("Device ID:    %s\n", DEVICE_ID);
+    Serial.printf("Device ID:    %s\n", KeyManager::getDeviceId().c_str());
+    Serial.printf("MAC Address:  %s\n", KeyManager::getMacAddress().c_str());
+    Serial.printf("Private Key:  %s\n", KeyManager::hasPrivateKey() ? "OK (NVS)" : "MISSING!");
     Serial.printf("Interval:     %d ms\n", INTERVAL_MS);
     Serial.printf("LED Pin:      GPIO%d\n", LED_PIN);
     Serial.println("============================================================\n");
@@ -42,6 +46,15 @@ void setup() {
     // Conectar WiFi
     WiFiManager::connect();
 
+    // Sincronizar tempo via NTP (requer WiFi)
+    Serial.println("Sincronizando horario via NTP...");
+    TimeManager::init();
+    if (TimeManager::isSynced()) {
+        Serial.printf("NTP OK: %s\n", TimeManager::getTimeString().c_str());
+    } else {
+        Serial.println("AVISO: NTP nao sincronizado, usando fallback");
+    }
+
     // LED - pronto para operar
     Led::blink(2, BLINK_NORMAL);
 
@@ -49,14 +62,18 @@ void setup() {
 }
 
 void loop() {
-    // Verificar conexao WiFi
-    WiFiManager::ensureConnection();
+    // Verificar conexao WiFi (non-blocking)
+    if (!WiFiManager::isConnected()) {
+        WiFiManager::tryReconnect();
+        delay(INTERVAL_MS);
+        return;  // Skip this cycle if not connected
+    }
 
     // Ler sensores
     SensorReading reading = Sensors::read();
 
-    // Enviar leitura
-    HttpClient::sendReading(DEVICE_ID, reading);
+    // Enviar leitura (usa KeyManager::getDeviceId() internamente)
+    HttpClient::sendReading(KeyManager::getDeviceId().c_str(), reading);
 
     // Aguardar intervalo
     delay(INTERVAL_MS);

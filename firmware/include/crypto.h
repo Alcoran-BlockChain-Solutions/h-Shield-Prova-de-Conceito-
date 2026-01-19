@@ -20,6 +20,16 @@ namespace Crypto {
 
     // Check if crypto is initialized
     bool isInitialized();
+
+    // Proof of Work result structure
+    struct PoWResult {
+        uint32_t nonce;
+        String hash;
+        bool success;
+    };
+
+    // Compute Proof of Work: finds nonce where SHA256(data + nonce) starts with difficulty zeros
+    PoWResult computePoW(const char* data, uint8_t difficulty = 2);
 }
 
 #endif // CRYPTO_H

@@ -25,6 +25,12 @@ namespace StatsManager {
     void incrementFailed();
     void incrementBlockchainSuccess();
     void incrementBlockchainFailed();
+
+    // Persistence (NVS)
+    void save();
+    void load();
+    void reset();
+
     void print();
 }
 

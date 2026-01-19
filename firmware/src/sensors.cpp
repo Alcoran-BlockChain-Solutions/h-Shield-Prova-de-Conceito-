@@ -1,28 +1,46 @@
 /*
  * HarvestShield - Sensors Module
- * Leitura de sensores (simulados por enquanto)
+ * Aggregates all individual sensor readings
  */
 
 #include "sensors.h"
+#include "sensors/temperature.h"
+#include "sensors/humidity_air.h"
+#include "sensors/humidity_soil.h"
+#include "sensors/luminosity.h"
 
 namespace Sensors {
 
 void init() {
-    // Seed para numeros aleatorios
+    // Seed for random numbers (used by simulated sensors)
     randomSeed(analogRead(0));
+
+    // Initialize each sensor
+    Temperature::init();
+    HumidityAir::init();
+    HumiditySoil::init();
+    Luminosity::init();
 }
 
 SensorReading read() {
     SensorReading reading;
-    reading.temperature = randomFloat(15.0, 40.0);
-    reading.humidity_air = randomFloat(30.0, 90.0);
-    reading.humidity_soil = randomFloat(20.0, 80.0);
-    reading.luminosity = random(1000, 100001);
+    reading.temperature = Temperature::read();
+    reading.humidity_air = HumidityAir::read();
+    reading.humidity_soil = HumiditySoil::read();
+    reading.luminosity = Luminosity::read();
     return reading;
 }
 
-float randomFloat(float min, float max) {
-    return min + (float)random(0, 10001) / 10000.0 * (max - min);
+String buildDataString(const SensorReading& reading) {
+    // Format: "temp-25.50;hum_air-60.00;hum_soil-45.00;lum-1000"
+    char buffer[128];
+    snprintf(buffer, sizeof(buffer),
+        "temp-%.2f;hum_air-%.2f;hum_soil-%.2f;lum-%d",
+        reading.temperature,
+        reading.humidity_air,
+        reading.humidity_soil,
+        reading.luminosity);
+    return String(buffer);
 }
 
 } // namespace Sensors
