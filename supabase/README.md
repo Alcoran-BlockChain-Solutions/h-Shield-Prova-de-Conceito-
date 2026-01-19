@@ -5,15 +5,34 @@
 ```
 supabase/
 ├── functions/
-│   ├── oracle/           # Recebe dados, normaliza, salva DB, registra Stellar
+│   ├── oracle/           # Recebe dados, valida PoW+ECDSA, salva DB, registra Stellar
 │   │   └── index.ts
-│   └── get-readings/     # Recupera dados do DB
+│   └── get-readings/     # Recupera dados do DB (público)
 │       └── index.ts
 ├── migrations/
-│   └── 001_create_readings_table.sql
+│   ├── 001_create_readings_table.sql  # Tabela de leituras
+│   ├── 002_create_devices_table.sql   # Tabela de dispositivos + chaves públicas
+│   ├── 003_add_blockchain_error.sql   # Campo para erros de blockchain
+│   └── 004_fix_rls_performance.sql    # Políticas RLS otimizadas
 ├── config.toml
 └── .env.example
 ```
+
+## Autenticação IoT
+
+O oracle usa um sistema de autenticação em 3 camadas:
+
+1. **Proof of Work (PoW):** O dispositivo deve computar `SHA256(data + nonce)` que comece com `000` (dificuldade 3, ~4096 tentativas médias)
+2. **Assinatura ECDSA:** O hash do PoW é assinado com a chave privada do dispositivo
+3. **Anti-replay:** Timestamp deve estar dentro de 5 minutos do servidor
+
+Headers necessários:
+- `X-Device-ID`: ID do dispositivo (registrado no banco)
+- `X-PoW-Data`: String dos dados (`temp-X;hum_air-Y;hum_soil-Z;lum-W`)
+- `X-PoW-Nonce`: Nonce que resolve o PoW
+- `X-PoW-Hash`: SHA256(data + nonce) - deve começar com "000"
+- `X-Signature`: Assinatura ECDSA (base64) do PoW hash
+- `X-Timestamp`: Unix timestamp atual
 
 ## Setup
 
@@ -70,17 +89,26 @@ supabase functions deploy get-readings
 
 ```bash
 curl -X POST \
-  'https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/oracle' \
-  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkY3VldWR6ZHZnaXRucWdpdXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjkxMzEsImV4cCI6MjA4Mzg0NTEzMX0.n8CTVq8b7mA2eQrtmWoriDLeh9b8UNV1m9idEr9FQVY' \
+  'https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/oracle' \
+  -H 'Authorization: Bearer <YOUR_ANON_KEY>' \
   -H 'Content-Type: application/json' \
+  -H 'X-Device-ID: esp32-farm-001' \
+  -H 'X-PoW-Data: temp-28.50;hum_air-65.20;hum_soil-45.80;lum-32000' \
+  -H 'X-PoW-Nonce: <VALID_NONCE>' \
+  -H 'X-PoW-Hash: <SHA256_HASH_STARTING_WITH_000>' \
+  -H 'X-Signature: <ECDSA_SIGNATURE_BASE64>' \
+  -H 'X-Timestamp: <UNIX_TIMESTAMP>' \
   -d '{
     "device_id": "esp32-farm-001",
     "temperature": 28.5,
     "humidity_air": 65.2,
     "humidity_soil": 45.8,
-    "luminosity": 32000
+    "luminosity": 32000,
+    "timestamp": 1737200000
   }'
 ```
+
+> **Nota:** O ESP32 calcula automaticamente PoW (SHA256 com dificuldade 3) e assina com ECDSA.
 
 **Resposta:**
 ```json
@@ -100,16 +128,16 @@ curl -X POST \
 
 ```bash
 # Todas as leituras (últimas 100)
-curl 'https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/get-readings' \
-  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkY3VldWR6ZHZnaXRucWdpdXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjkxMzEsImV4cCI6MjA4Mzg0NTEzMX0.n8CTVq8b7mA2eQrtmWoriDLeh9b8UNV1m9idEr9FQVY'
+curl 'https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/get-readings' \
+  -H 'Authorization: Bearer <YOUR_ANON_KEY>'
 
 # Filtrar por device
-curl 'https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/get-readings?device_id=esp32-farm-001' \
-  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkY3VldWR6ZHZnaXRucWdpdXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjkxMzEsImV4cCI6MjA4Mzg0NTEzMX0.n8CTVq8b7mA2eQrtmWoriDLeh9b8UNV1m9idEr9FQVY'
+curl 'https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/get-readings?device_id=esp32-farm-001' \
+  -H 'Authorization: Bearer <YOUR_ANON_KEY>'
 
 # Com paginação
-curl 'https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/get-readings?limit=10&offset=0' \
-  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkY3VldWR6ZHZnaXRucWdpdXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjkxMzEsImV4cCI6MjA4Mzg0NTEzMX0.n8CTVq8b7mA2eQrtmWoriDLeh9b8UNV1m9idEr9FQVY'
+curl 'https://<YOUR_PROJECT_REF>.supabase.co/functions/v1/get-readings?limit=10&offset=0' \
+  -H 'Authorization: Bearer <YOUR_ANON_KEY>'
 ```
 
 **Resposta:**
@@ -158,8 +186,8 @@ python3 simulate_esp32.py
 
 Configure o `.env`:
 ```
-SUPABASE_URL = "https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1"
-SUPABASE_ANON_KEY = "your-anon-key"
+SUPABASE_URL = "https://<YOUR_PROJECT_REF>.supabase.co/functions/v1"
+SUPABASE_ANON_KEY = "<YOUR_ANON_KEY>"
 ```
 
 ---
@@ -204,30 +232,41 @@ Para **múltiplos sensores** ou maior frequência, considerar Pro Plan ($25/mês
 
 ---
 
-## Fluxo de Dados v0.1
+## Fluxo de Dados v0.13
 
 ```
-ESP32/Client
+ESP32 (Firmware)
     │
-    │ POST /oracle
+    │ 1. Lê sensores
+    │ 2. Constrói dataString: "temp-X;hum_air-Y;hum_soil-Z;lum-W"
+    │ 3. PoW: encontra nonce onde SHA256(data+nonce) começa com "000"
+    │ 4. Assina powHash com ECDSA
+    │
+    │ POST /oracle (headers: X-PoW-Data, X-PoW-Nonce, X-PoW-Hash, X-Signature)
     ▼
-┌─────────────────┐
-│  1. Validate    │
-│  2. Normalize   │
-│  3. Hash SHA256 │
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    │         │
-    ▼         ▼
-┌───────┐  ┌────────┐
-│  DB   │  │Stellar │
-│Insert │  │ManageData│
-└───────┘  └────────┘
+┌─────────────────────────────────────────────────────┐
+│  ORACLE                                             │
+│  1. Verifica PoW: SHA256(data+nonce) == hash ✓     │
+│  2. Verifica dificuldade: hash.startsWith("000") ✓ │
+│  3. Verifica ECDSA: signature(powHash) válida ✓    │
+│  4. Anti-replay: timestamp < 5min ✓                │
+│  5. Valida ranges dos dados                        │
+└────────────────────┬────────────────────────────────┘
+                     │
+                     │ 202 Accepted (async)
+                     │
+         ┌───────────┴───────────┐
+         │                       │
+         ▼                       ▼ (background)
+    ┌─────────┐           ┌────────────┐
+    │   DB    │           │  Stellar   │
+    │ INSERT  │           │ ManageData │
+    │ reading │           │ powHash    │
+    └─────────┘           └────────────┘
 ```
 
 
-PROOF OF CONCEPT
+## Links Úteis
 
-https://stellar.expert/explorer/testnet/account/GAEMQIJIAXII4PZUCDMCDGYY342LVR5P6XENNDYTKRCQW7MU7I2ROR7B
-https://pdcueudzdvgitnqgiuwp.supabase.co/functions/v1/get-readings
+- [Stellar Explorer (Testnet)](https://stellar.expert/explorer/testnet)
+- [Supabase Dashboard](https://supabase.com/dashboard)

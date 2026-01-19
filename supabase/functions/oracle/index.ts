@@ -1,9 +1,21 @@
-// HarvestShield Oracle - Edge Function v0.12
-// Receives sensor data, validates ECDSA signature, stores in DB, and records hash on Stellar
+// HarvestShield Oracle - Edge Function v0.13
+// Receives sensor data, validates PoW + ECDSA signature, stores in DB, and records hash on Stellar
 // RF11: Async mode - Returns 202 immediately, processes Stellar in background
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+// PoW difficulty: 3 = hash must start with "000" (~4096 attempts avg on IoT)
+const POW_DIFFICULTY = 3;
+const POW_PREFIX = "0".repeat(POW_DIFFICULTY);
+
+// Anti-replay: enabled by default for security
+const ANTI_REPLAY_ENABLED = true;
+const ANTI_REPLAY_MAX_AGE_SECONDS = 300; // 5 minutes
 
 // ============================================================================
 // LOGGING UTILITIES
@@ -46,8 +58,51 @@ interface ValidationResult {
 interface AuthHeaders {
   deviceId: string | null;
   signature: string | null;
-  dataHash: string | null;
   timestamp: string | null;
+  powData: string | null;    // "temp-X;hum_air-Y;hum_soil-Z;lum-W"
+  powNonce: string | null;   // nonce that solves PoW
+  powHash: string | null;    // SHA256(powData + powNonce)
+}
+
+// ============================================================================
+// PROOF OF WORK VERIFICATION
+// ============================================================================
+
+async function verifyProofOfWork(
+  auth: AuthHeaders
+): Promise<{ valid: boolean; hash: string; error?: string }> {
+  // Check required PoW headers
+  if (!auth.powData || !auth.powNonce || !auth.powHash) {
+    return { valid: false, hash: "", error: "Missing PoW headers (X-PoW-Data, X-PoW-Nonce, X-PoW-Hash)" };
+  }
+
+  // Compute hash: SHA256(powData + powNonce)
+  const encoder = new TextEncoder();
+  const input = auth.powData + auth.powNonce;
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(input));
+  const computedHash = Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  // Verify computed hash matches provided hash
+  if (computedHash !== auth.powHash) {
+    return {
+      valid: false,
+      hash: computedHash,
+      error: `PoW hash mismatch: computed ${computedHash.substring(0, 16)}... != provided ${auth.powHash.substring(0, 16)}...`
+    };
+  }
+
+  // Check if hash starts with required prefix (difficulty 3 = "000")
+  if (!computedHash.startsWith(POW_PREFIX)) {
+    return {
+      valid: false,
+      hash: computedHash,
+      error: `PoW invalid: hash does not start with '${POW_PREFIX}' (difficulty ${POW_DIFFICULTY})`
+    };
+  }
+
+  return { valid: true, hash: computedHash };
 }
 
 // ============================================================================
@@ -58,8 +113,10 @@ function extractAuthHeaders(req: Request): AuthHeaders {
   return {
     deviceId: req.headers.get("x-device-id"),
     signature: req.headers.get("x-signature"),
-    dataHash: req.headers.get("x-data-hash"),
     timestamp: req.headers.get("x-timestamp"),
+    powData: req.headers.get("x-pow-data"),
+    powNonce: req.headers.get("x-pow-nonce"),
+    powHash: req.headers.get("x-pow-hash"),
   };
 }
 
@@ -144,23 +201,20 @@ function extractInteger(data: Uint8Array, start: number, len: number, targetLen:
 
 async function verifyDeviceSignature(
   supabase: ReturnType<typeof createClient>,
-  payload: string,
   auth: AuthHeaders
 ): Promise<{ valid: boolean; error?: string }> {
   // 1. Check required headers
-  if (!auth.deviceId || !auth.signature || !auth.dataHash) {
-    return { valid: false, error: "Missing authentication headers (X-Device-ID, X-Signature, X-Data-Hash)" };
+  if (!auth.deviceId || !auth.signature || !auth.powHash) {
+    return { valid: false, error: "Missing authentication headers (X-Device-ID, X-Signature, X-PoW-Hash)" };
   }
 
-  // 2. Anti-replay check (configurable via ENV)
-  const enableAntiReplay = Deno.env.get("ENABLE_ANTI_REPLAY") === "true";
-
-  if (enableAntiReplay) {
+  // 2. Anti-replay check
+  if (ANTI_REPLAY_ENABLED) {
     if (!auth.timestamp) {
-      return { valid: false, error: "X-Timestamp required when anti-replay is enabled" };
+      return { valid: false, error: "X-Timestamp required for anti-replay protection" };
     }
 
-    const maxAge = parseInt(Deno.env.get("ANTI_REPLAY_MAX_AGE_SECONDS") || "300");
+    const maxAge = parseInt(Deno.env.get("ANTI_REPLAY_MAX_AGE_SECONDS") || String(ANTI_REPLAY_MAX_AGE_SECONDS));
     const now = Math.floor(Date.now() / 1000);
     const msgTime = parseInt(auth.timestamp);
 
@@ -174,18 +228,7 @@ async function verifyDeviceSignature(
     }
   }
 
-  // 3. Verify hash matches payload
-  const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(payload));
-  const expectedHash = Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  if (auth.dataHash !== expectedHash) {
-    return { valid: false, error: "Data hash mismatch - payload may have been tampered" };
-  }
-
-  // 4. Get device public key from database
+  // 3. Get device public key from database
   const { data: device, error: dbError } = await supabase
     .from("devices")
     .select("public_key, active, total_readings")
@@ -200,7 +243,7 @@ async function verifyDeviceSignature(
     return { valid: false, error: "Device deactivated" };
   }
 
-  // 5. Verify ECDSA signature
+  // 4. Verify ECDSA signature of PoW hash
   try {
     const derSignature = Uint8Array.from(atob(auth.signature), c => c.charCodeAt(0));
     const signatureBytes = derToP1363(derSignature);
@@ -213,20 +256,22 @@ async function verifyDeviceSignature(
       ["verify"]
     );
 
-    const payloadBytes = encoder.encode(payload);
+    // Signature is over the PoW hash (hex string)
+    const encoder = new TextEncoder();
+    const powHashBytes = encoder.encode(auth.powHash);
 
     const isValid = await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       publicKey,
       signatureBytes,
-      payloadBytes
+      powHashBytes
     );
 
     if (!isValid) {
       return { valid: false, error: "Invalid signature" };
     }
 
-    // 6. Update device last_seen and increment readings count
+    // 5. Update device last_seen and increment readings count
     await supabase
       .from("devices")
       .update({
@@ -338,8 +383,9 @@ async function normalize(raw: RawReading): Promise<NormalizedReading> {
 // ============================================================================
 
 async function recordOnStellar(
-  dataHash: string,
-  timestamp: number
+  powHash: string,
+  timestamp: number,
+  powNonce: string
 ): Promise<{ success: boolean; txHash?: string; error?: string }> {
   const stellarSecretKey = Deno.env.get("STELLAR_SECRET_KEY");
   const stellarNetwork = Deno.env.get("STELLAR_NETWORK") || "testnet";
@@ -373,6 +419,10 @@ async function recordOnStellar(
     const account = await server.loadAccount(sourceKeypair.publicKey());
     const dataKey = `r_${timestamp}`;
 
+    // Store the PoW hash (already includes proof of work) + nonce for verification
+    // Format: "<pow_hash_56chars>:<nonce>" (max 64 bytes for Stellar ManageData)
+    const dataValue = `${powHash.substring(0, 56)}:${powNonce}`;
+
     const transaction = new TransactionBuilder(account, {
       fee: "100",
       networkPassphrase,
@@ -380,7 +430,7 @@ async function recordOnStellar(
       .addOperation(
         Operation.manageData({
           name: dataKey,
-          value: dataHash,
+          value: dataValue,
         })
       )
       .setTimeout(30)
@@ -407,7 +457,7 @@ async function saveToDatabase(
   supabase: ReturnType<typeof createClient>,
   normalized: NormalizedReading,
   rawData: RawReading,
-  iotHash: string
+  powHash: string
 ): Promise<string> {
   const { data, error } = await supabase
     .from("readings")
@@ -418,7 +468,7 @@ async function saveToDatabase(
       humidity_soil: normalized.humidity_soil,
       luminosity: normalized.luminosity,
       raw_data: rawData,
-      normalized_hash: iotHash,
+      normalized_hash: powHash, // Store the PoW hash (proof of work verified)
       normalized_at: new Date(normalized.timestamp).toISOString(),
       blockchain_tx_hash: null,
       blockchain_status: "pending",
@@ -464,27 +514,41 @@ async function processStellarInBackground(
   supabaseUrl: string,
   supabaseServiceKey: string,
   readingId: string,
-  dataHash: string,
-  timestamp: number
+  powHash: string,
+  timestamp: number,
+  powNonce: string
 ): Promise<void> {
   const startTime = Date.now();
 
   try {
-    const stellarResult = await recordOnStellar(dataHash, timestamp);
+    const stellarResult = await recordOnStellar(powHash, timestamp, powNonce);
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     await updateBlockchainResult(supabase, readingId, stellarResult);
 
     const time = Date.now() - startTime;
     const status = stellarResult.success ? "OK" : "FAIL";
-    log(`5. Stellar ${status}`, time);
+    log(`6. Stellar ${status}`, time);
+
+    if (stellarResult.success) {
+      log(`   TX: ${stellarResult.txHash}`);
+    } else {
+      log(`   Error: ${stellarResult.error}`);
+    }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown background error";
+    log(`6. Stellar ERROR: ${errorMessage}`);
+
     try {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
       await updateBlockchainResult(supabase, readingId, {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown background error",
+        error: errorMessage,
       });
-    } catch (_) {}
+    } catch (dbError) {
+      // Log DB update failure instead of silently ignoring
+      const dbErrorMsg = dbError instanceof Error ? dbError.message : "Unknown DB error";
+      log(`   DB update failed: ${dbErrorMsg}`);
+    }
   }
 }
 
@@ -498,7 +562,7 @@ serve(async (req: Request) => {
   // CORS headers
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-device-id, x-signature, x-data-hash, x-timestamp",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-device-id, x-signature, x-timestamp, x-pow-data, x-pow-nonce, x-pow-hash",
   };
 
   if (req.method === "OPTIONS") {
@@ -523,12 +587,25 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 2. Auth
+    // 2. Verify Proof of Work
     t = Date.now();
     const auth = extractAuthHeaders(req);
-    const authResult = await verifyDeviceSignature(supabase, bodyText, auth);
+    const powResult = await verifyProofOfWork(auth);
+    const tPoW = Date.now() - t;
+    log(`2. PoW ${powResult.valid ? "OK" : "FAIL"}`, tPoW);
+
+    if (!powResult.valid) {
+      return new Response(
+        JSON.stringify({ success: false, error: powResult.error }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 3. Verify Device Signature (signature of PoW hash)
+    t = Date.now();
+    const authResult = await verifyDeviceSignature(supabase, auth);
     const tAuth = Date.now() - t;
-    log(`2. Auth ${authResult.valid ? "OK" : "FAIL"}`, tAuth);
+    log(`3. Auth ${authResult.valid ? "OK" : "FAIL"}`, tAuth);
 
     if (!authResult.valid) {
       return new Response(
@@ -537,10 +614,10 @@ serve(async (req: Request) => {
       );
     }
 
-    // 3. Validate
+    // 4. Validate
     t = Date.now();
     const validation = validate(body);
-    log(`3. Validate ${validation.valid ? "OK" : "FAIL"}`, Date.now() - t);
+    log(`4. Validate ${validation.valid ? "OK" : "FAIL"}`, Date.now() - t);
 
     if (!validation.valid) {
       return new Response(
@@ -549,20 +626,21 @@ serve(async (req: Request) => {
       );
     }
 
-    // 4. Save DB
+    // 5. Save DB
     t = Date.now();
     const normalized = await normalize(validation.data!);
-    const readingId = await saveToDatabase(supabase, normalized, validation.data!, auth.dataHash!);
+    const readingId = await saveToDatabase(supabase, normalized, validation.data!, auth.powHash!);
     const tDatabase = Date.now() - t;
-    log("4. Database", tDatabase);
+    log("5. Database", tDatabase);
 
-    // 5. Stellar (background)
+    // 6. Stellar (background)
     const stellarPromise = processStellarInBackground(
       supabaseUrl,
       supabaseServiceKey,
       readingId,
-      auth.dataHash!,
-      normalized.timestamp
+      auth.powHash!,
+      normalized.timestamp,
+      auth.powNonce!
     );
 
     // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
@@ -580,9 +658,9 @@ serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         reading_id: readingId,
-        data_hash: auth.dataHash,
+        pow: { data: auth.powData, nonce: auth.powNonce, hash: powResult.hash },
         blockchain: { status: "pending" },
-        timing: { total_ms: totalTime, auth_ms: tAuth, database_ms: tDatabase },
+        timing: { total_ms: totalTime, pow_ms: tPoW, auth_ms: tAuth, database_ms: tDatabase },
       }),
       { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
