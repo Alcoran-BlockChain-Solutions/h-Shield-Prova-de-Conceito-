@@ -287,16 +287,23 @@ body {
   color: var(--color-error);
 }
 
-/* Transaction link */
-.transaction-link {
+/* Transaction link button */
+.transaction-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--color-secondary);
+  color: white;
+  font-size: 0.75rem;
   font-family: monospace;
-  font-size: 0.875rem;
-  color: var(--color-secondary);
   text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s ease;
 }
 
-.transaction-link:hover {
-  text-decoration: underline;
+.transaction-link-btn:hover {
+  background-color: #1565c0;
 }
 
 /* Connection status */

@@ -19,13 +19,13 @@ export function TransactionLink({ txHash, onClick }: TransactionLinkProps) {
   return (
     <a
       href={explorerUrl}
-      className="transaction-link"
+      className="transaction-link-btn"
       onClick={handleClick}
       target="_blank"
       rel="noopener noreferrer"
       title={txHash}
     >
-      {shortHash}
+      view on-chain {shortHash}
     </a>
   )
 }
