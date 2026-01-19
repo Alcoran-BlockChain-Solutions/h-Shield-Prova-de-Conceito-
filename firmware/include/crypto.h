@@ -21,6 +21,9 @@ namespace Crypto {
     // Check if crypto is initialized
     bool isInitialized();
 
+    // Get public key in PEM format (derived from private key)
+    String getPublicKeyPEM();
+
     // Proof of Work result structure
     struct PoWResult {
         uint32_t nonce;

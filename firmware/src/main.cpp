@@ -38,6 +38,9 @@ void setup() {
     Serial.printf("Private Key:  %s\n", KeyManager::hasPrivateKey() ? "OK (NVS)" : "MISSING!");
     Serial.printf("Interval:     %d ms\n", INTERVAL_MS);
     Serial.printf("LED Pin:      GPIO%d\n", LED_PIN);
+    Serial.println("============================================================");
+    Serial.println("Public Key (PEM):");
+    Serial.println(Crypto::getPublicKeyPEM());
     Serial.println("============================================================\n");
 
     // LED inicial - boot

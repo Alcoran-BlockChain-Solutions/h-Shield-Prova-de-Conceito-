@@ -97,6 +97,24 @@ bool isInitialized() {
     return initialized;
 }
 
+String getPublicKeyPEM() {
+    if (!initialized) {
+        return "";
+    }
+
+    unsigned char buf[512];
+    int ret = mbedtls_pk_write_pubkey_pem(&pk, buf, sizeof(buf));
+
+    if (ret != 0) {
+        char error_buf[100];
+        mbedtls_strerror(ret, error_buf, sizeof(error_buf));
+        Serial.printf("[Crypto] ERROR: Failed to export public key: %s\n", error_buf);
+        return "";
+    }
+
+    return String((char*)buf);
+}
+
 String sha256(const char* data) {
     unsigned long t0 = millis();
     size_t inputLen = strlen(data);
@@ -125,13 +143,11 @@ String sign(const char* hexHash) {
 
     unsigned long t0 = millis();
 
-    // Convert hex hash string to bytes
-    unsigned char hashBytes[32];
-    for (int i = 0; i < 32; i++) {
-        unsigned int byte;
-        sscanf(hexHash + (i * 2), "%2x", &byte);
-        hashBytes[i] = (unsigned char)byte;
-    }
+    // Web Crypto API does SHA256 of the message before verifying
+    // So we must sign SHA256(hex_string), not the raw hash bytes
+    // This way both sides compute: sign/verify(SHA256("000abc...64chars"))
+    unsigned char messageHash[32];
+    mbedtls_sha256((const unsigned char*)hexHash, strlen(hexHash), messageHash, 0);
 
     unsigned long tConvert = millis() - t0;
 
@@ -141,7 +157,7 @@ String sign(const char* hexHash) {
     size_t sig_len = 0;
 
     int ret = mbedtls_pk_sign(&pk, MBEDTLS_MD_SHA256,
-        hashBytes, 32,
+        messageHash, 32,
         sig, &sig_len,
         mbedtls_ctr_drbg_random, &ctr_drbg);
 

@@ -134,6 +134,18 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
 }
 
 /**
+ * Convert hex string to binary bytes
+ * "000abc..." (64 chars) -> Uint8Array (32 bytes)
+ */
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
+}
+
+/**
  * Convert DER-encoded ECDSA signature to IEEE P1363 format (r||s)
  * Web Crypto API expects P1363 format, but mbedTLS/OpenSSL produce DER format
  */
@@ -256,9 +268,11 @@ async function verifyDeviceSignature(
       ["verify"]
     );
 
-    // Signature is over the PoW hash (hex string)
+    // Web Crypto verify() with hash:"SHA-256" will hash the data before verifying
+    // IoT uses mbedtls_pk_sign with pre-computed hash bytes
+    // So we need to pass the hex STRING (not bytes) - WebCrypto will SHA256 it
     const encoder = new TextEncoder();
-    const powHashBytes = encoder.encode(auth.powHash);
+    const powHashBytes = encoder.encode(auth.powHash);  // 64 ASCII bytes of hex string
 
     const isValid = await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
