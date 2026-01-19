@@ -492,14 +492,17 @@ async function recordOnStellar(
     debug(reqId, "STELLAR", `Account loaded, sequence: ${account.sequence}`);
 
     const dataKey = `r_${timestamp}`;
+    const Memo = Stellar.Memo || StellarModule.Memo;
+
     debug(reqId, "STELLAR", `Data key: ${dataKey}`);
     debug(reqId, "STELLAR", `Data value: ${powHash}`);
+    debug(reqId, "STELLAR", `Memo: PoW Nonce: ${powNonce}`);
 
     debug(reqId, "STELLAR", "Building transaction...");
     const transaction = new TransactionBuilder(account, {
       fee: "100",
       networkPassphrase,
-      memo: `PoW Nonce: ${powNonce}`,
+      memo: Memo.text(`PoW Nonce: ${powNonce}`),
     })
       .addOperation(
         Operation.manageData({
@@ -519,12 +522,12 @@ async function recordOnStellar(
     debug(reqId, "STELLAR", `SUCCESS! TX Hash: ${result.hash}`);
     return { success: true, txHash: result.hash };
 
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown Stellar error";
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown Stellar error";
     error(reqId, "STELLAR", errorMessage);
 
-    if (error && typeof error === 'object') {
-      const stellarError = error as { response?: { data?: { extras?: { result_codes?: unknown } } } };
+    if (err && typeof err === 'object') {
+      const stellarError = err as { response?: { data?: { extras?: { result_codes?: unknown } } } };
       if (stellarError.response?.data?.extras?.result_codes) {
         error(reqId, "STELLAR", "Result codes", stellarError.response.data.extras.result_codes);
       }
@@ -627,8 +630,8 @@ async function processStellarInBackground(
       debug(reqId, "BACKGROUND", `Error: ${stellarResult.error}`);
     }
 
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown background error";
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown background error";
     error(reqId, "BACKGROUND", errorMessage);
 
     try {
@@ -637,8 +640,8 @@ async function processStellarInBackground(
         success: false,
         error: errorMessage,
       });
-    } catch (dbError) {
-      const dbErrorMsg = dbError instanceof Error ? dbError.message : "Unknown DB error";
+    } catch (dbErr) {
+      const dbErrorMsg = dbErr instanceof Error ? dbErr.message : "Unknown DB error";
       error(reqId, "BACKGROUND", `DB update failed: ${dbErrorMsg}`);
     }
   }
