@@ -492,19 +492,19 @@ async function recordOnStellar(
     debug(reqId, "STELLAR", `Account loaded, sequence: ${account.sequence}`);
 
     const dataKey = `r_${timestamp}`;
-    const dataValue = `${powHash.substring(0, 56)}:${powNonce}`;
     debug(reqId, "STELLAR", `Data key: ${dataKey}`);
-    debug(reqId, "STELLAR", `Data value: ${dataValue}`);
+    debug(reqId, "STELLAR", `Data value: ${powHash}`);
 
     debug(reqId, "STELLAR", "Building transaction...");
     const transaction = new TransactionBuilder(account, {
       fee: "100",
       networkPassphrase,
+      memo: `PoW Nonce: ${powNonce}`,
     })
       .addOperation(
         Operation.manageData({
           name: dataKey,
-          value: dataValue,
+          value: powHash,
         })
       )
       .setTimeout(30)
