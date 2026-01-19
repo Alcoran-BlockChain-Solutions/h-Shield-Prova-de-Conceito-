@@ -272,13 +272,8 @@ def main():
 
             if success:
                 stats["success"] += 1
-                blockchain = response.get("blockchain", {})
-                if blockchain.get("status") == "pending":
-                    stats["blockchain_pending"] += 1
-                    reading_id = response.get("reading_id", "?")[:8]
-                    status = f"202 Accepted | PoW: {pow_attempts} attempts ({pow_time*1000:.0f}ms) | ID: {reading_id}"
-                else:
-                    status = f"OK | PoW: {pow_attempts} attempts"
+                stats["blockchain_pending"] += 1
+                status = f"202 OK | PoW: {pow_attempts} attempts ({pow_time*1000:.0f}ms)"
             else:
                 stats["failed"] += 1
                 error = response.get("error", response.get("errors", "unknown"))
