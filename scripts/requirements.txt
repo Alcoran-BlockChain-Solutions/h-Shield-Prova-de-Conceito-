@@ -1,0 +1,4 @@
+# HarvestShield Scripts Dependencies
+
+# ECDSA P-256 signing for ESP32 simulator
+cryptography>=41.0.0

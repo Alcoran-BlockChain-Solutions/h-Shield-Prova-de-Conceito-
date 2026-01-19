@@ -1,13 +1,41 @@
+#!/usr/bin/env python3
+"""
+Oracle Test - HarvestShield
+
+Single-shot test script to send one reading to the oracle endpoint
+with full security: PoW (Proof of Work) + ECDSA P-256 signature.
+
+Usage:
+    python oracle.py
+
+Configuration via .env file:
+    SUPABASE_URL=https://your-project.supabase.co/functions/v1
+    SUPABASE_ANON_KEY=your-anon-key
+    DEVICE_ID=esp32-farm-001
+    PRIVATE_KEY_PATH=../keys/esp32-farm-001.key
+"""
+
+import hashlib
 import json
 import os
 import random
-import urllib.request
-import hashlib
-import base64
 import time
+import urllib.request
+import urllib.error
 
-# Load .env file manually
+# ECDSA signing requires cryptography library
+try:
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.backends import default_backend
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
+    print("ERROR: cryptography library not installed. Run: pip install cryptography\n")
+
+
 def load_env():
+    """Load environment variables from .env file."""
     env_path = os.path.join(os.path.dirname(__file__), ".env")
     if os.path.exists(env_path):
         with open(env_path) as f:
@@ -17,34 +45,34 @@ def load_env():
                     key, value = line.split("=", 1)
                     os.environ[key.strip()] = value.strip().strip('"').strip("'")
 
+
 load_env()
 
-# Configuration - Use unregistered device (should fail auth)
-DEVICE_ID = "esp32-farm-001"
-PRIVATE_KEY_PATH = os.path.join(os.path.dirname(__file__), "..", "keys", "esp32-farm-001.key")
+# Configuration
+DEVICE_ID = os.getenv("DEVICE_ID", "esp32-farm-001")
+POW_DIFFICULTY = int(os.getenv("POW_DIFFICULTY", "3"))
+POW_PREFIX = "0" * POW_DIFFICULTY
 
 # Supabase configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")  # e.g. http://127.0.0.1:54321/functions/v1
+SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 FUNCTION_URL = f"{SUPABASE_URL}/oracle"
 
-# Try to import cryptography library
-try:
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import ec
-    from cryptography.hazmat.backends import default_backend
-    CRYPTO_AVAILABLE = True
-except ImportError:
-    CRYPTO_AVAILABLE = False
-    print("Warning: cryptography library not installed. Run: pip install cryptography")
+# Private key for ECDSA signing
+PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH", "../keys/esp32-farm-001.key")
 
 
 def load_private_key():
-    """Load ECDSA private key from PEM file"""
-    if not CRYPTO_AVAILABLE:
+    """Load ECDSA private key from PEM file."""
+    if not HAS_CRYPTO:
         return None
 
-    with open(PRIVATE_KEY_PATH, "rb") as f:
+    key_path = os.path.join(os.path.dirname(__file__), PRIVATE_KEY_PATH)
+    if not os.path.exists(key_path):
+        print(f"ERROR: Private key not found at {key_path}")
+        return None
+
+    with open(key_path, "rb") as f:
         private_key = serialization.load_pem_private_key(
             f.read(),
             password=None,
@@ -53,111 +81,165 @@ def load_private_key():
     return private_key
 
 
-def sha256_hex(data: str) -> str:
-    """Compute SHA256 hash and return as hex string"""
-    return hashlib.sha256(data.encode("utf-8")).hexdigest()
-
-
-def sign_hash(private_key, hash_hex: str) -> str:
-    """Sign a hash with ECDSA and return base64-encoded signature"""
-    if not CRYPTO_AVAILABLE or private_key is None:
-        return ""
-
-    # Convert hex hash to bytes
-    hash_bytes = bytes.fromhex(hash_hex)
-
-    # Sign the hash (not the data) - use Prehashed since we already have the hash
-    from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
-    signature = private_key.sign(
-        hash_bytes,
-        ec.ECDSA(Prehashed(hashes.SHA256()))
-    )
-
-    # Return base64 encoded signature
-    return base64.b64encode(signature).decode("utf-8")
-
-
 def generate_sensor_data():
+    """Generate random sensor readings within valid ranges."""
     return {
         "device_id": DEVICE_ID,
-        "temperature": random.uniform(15.0, 40.0),
-        "humidity_air": random.uniform(30.0, 90.0),
-        "humidity_soil": random.uniform(20.0, 80.0),
-        "luminosity": random.randint(1000, 100000),
+        "temperature": round(random.uniform(20.0, 30.0), 2),
+        "humidity_air": round(random.uniform(50.0, 70.0), 2),
+        "humidity_soil": round(random.uniform(40.0, 60.0), 2),
+        "luminosity": random.randint(10000, 50000),
     }
 
 
-def format_json_like_esp32(data: dict) -> str:
-    """Format JSON exactly like ESP32's snprintf with %.2f for floats"""
-    return (
-        '{"device_id":"%s","temperature":%.2f,"humidity_air":%.2f,'
-        '"humidity_soil":%.2f,"luminosity":%d,"timestamp":%d}'
-    ) % (
-        data["device_id"],
-        data["temperature"],
-        data["humidity_air"],
-        data["humidity_soil"],
-        data["luminosity"],
-        data["timestamp"],
+def format_pow_data(data: dict) -> str:
+    """
+    Format sensor data for PoW computation.
+    Format: temp-X;hum_air-Y;hum_soil-Z;lum-W
+    """
+    parts = []
+    if data.get("temperature") is not None:
+        parts.append(f"temp-{data['temperature']}")
+    if data.get("humidity_air") is not None:
+        parts.append(f"hum_air-{data['humidity_air']}")
+    if data.get("humidity_soil") is not None:
+        parts.append(f"hum_soil-{data['humidity_soil']}")
+    if data.get("luminosity") is not None:
+        parts.append(f"lum-{data['luminosity']}")
+    return ";".join(parts)
+
+
+def solve_pow(pow_data: str) -> tuple[str, str, int]:
+    """
+    Solve Proof of Work by finding nonce where SHA256(data + nonce) starts with prefix.
+    Returns: (nonce, hash, attempts)
+    """
+    nonce = 0
+    while True:
+        nonce += 1
+        input_str = pow_data + str(nonce)
+        hash_hex = hashlib.sha256(input_str.encode()).hexdigest()
+        if hash_hex.startswith(POW_PREFIX):
+            return str(nonce), hash_hex, nonce
+
+
+def sign_message(private_key, message: str) -> str:
+    """
+    Sign a message with ECDSA P-256 and return base64-encoded DER signature.
+    """
+    if not HAS_CRYPTO or private_key is None:
+        return ""
+
+    import base64
+    signature_der = private_key.sign(
+        message.encode(),
+        ec.ECDSA(hashes.SHA256())
     )
+    return base64.b64encode(signature_der).decode()
 
 
 def send_reading():
+    """Send a single reading to the oracle."""
+    print("=" * 70)
+    print("ORACLE TEST - HarvestShield")
+    print("=" * 70)
+    print(f"Device ID:      {DEVICE_ID}")
+    print(f"PoW Difficulty: {POW_DIFFICULTY}")
+    print(f"Endpoint:       {FUNCTION_URL}")
+    print(f"Private Key:    {PRIVATE_KEY_PATH}")
+    print("=" * 70)
+
     # Load private key
     private_key = load_private_key()
-    if private_key is None and CRYPTO_AVAILABLE:
-        print(f"Error: Could not load private key from {PRIVATE_KEY_PATH}")
+    if private_key is None:
+        if HAS_CRYPTO:
+            print("\nERROR: Could not load private key. Exiting.")
         return None
 
-    # Generate sensor data with timestamp
+    # Generate data
     data = generate_sensor_data()
-    data["timestamp"] = int(time.time())
+    timestamp = int(time.time())
 
-    # Convert to JSON (format exactly like ESP32's snprintf)
-    json_payload = format_json_like_esp32(data)
+    print(f"\n1. Generated sensor data:")
+    print(f"   Temperature:   {data['temperature']}C")
+    print(f"   Humidity Air:  {data['humidity_air']}%")
+    print(f"   Humidity Soil: {data['humidity_soil']}%")
+    print(f"   Luminosity:    {data['luminosity']} lux")
 
-    # Compute hash
-    data_hash = sha256_hex(json_payload)
+    # Format PoW data
+    pow_data = format_pow_data(data)
+    print(f"\n2. PoW Data: {pow_data}")
 
-    # Sign the hash
-    signature = sign_hash(private_key, data_hash)
+    # Solve PoW
+    print(f"\n3. Solving PoW (difficulty {POW_DIFFICULTY})...")
+    pow_start = time.time()
+    nonce, pow_hash, attempts = solve_pow(pow_data)
+    pow_time = time.time() - pow_start
+    print(f"   Solved in {attempts} attempts ({pow_time*1000:.0f}ms)")
+    print(f"   Nonce: {nonce}")
+    print(f"   Hash:  {pow_hash[:32]}...")
 
-    # Build headers with authentication
+    # Sign the PoW hash
+    print(f"\n4. Signing PoW hash with ECDSA P-256...")
+    signature = sign_message(private_key, pow_hash)
+    print(f"   Signature: {signature[:32]}...")
+
+    # Prepare headers
     headers = {
         "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
         "Content-Type": "application/json",
         "X-Device-ID": DEVICE_ID,
-        "X-Data-Hash": data_hash,
+        "X-Timestamp": str(timestamp),
+        "X-PoW-Data": pow_data,
+        "X-PoW-Nonce": nonce,
+        "X-PoW-Hash": pow_hash,
         "X-Signature": signature,
-        "X-Timestamp": str(data["timestamp"]),
     }
 
-    print(f"Sending data: {data}")
-    print(f"Hash: {data_hash[:32]}...")
-    print(f"Signature: {signature[:32]}...")
-
+    # Send request
+    print(f"\n5. Sending to oracle...")
     req = urllib.request.Request(
         FUNCTION_URL,
-        data=json_payload.encode("utf-8"),
+        data=json.dumps(data).encode("utf-8"),
         headers=headers,
         method="POST",
     )
 
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=30) as response:
             status = response.status
             body = json.loads(response.read().decode("utf-8"))
-            print(f"Status: {status}")
-            print(f"Response: {json.dumps(body, indent=2)}")
+
+            print(f"\n" + "=" * 70)
+            print(f"RESPONSE - Status: {status}")
+            print("=" * 70)
+            print(json.dumps(body, indent=2))
+
+            if body.get("success"):
+                print("\nSUCCESS! Reading accepted by oracle.")
+                if body.get("blockchain", {}).get("status") == "pending":
+                    print("Blockchain transaction is being processed in background.")
             return body
+
     except urllib.error.HTTPError as e:
-        print(f"Status: {e.code}")
-        print(f"Response: {json.loads(e.read().decode('utf-8'))}")
+        try:
+            body = json.loads(e.read().decode("utf-8"))
+        except Exception:
+            body = {"error": f"HTTP {e.code}"}
+
+        print(f"\n" + "=" * 70)
+        print(f"ERROR - Status: {e.code}")
+        print("=" * 70)
+        print(json.dumps(body, indent=2))
+        return body
+
+    except Exception as e:
+        print(f"\nERROR: {e}")
         return None
 
 
 if __name__ == "__main__":
-    if not CRYPTO_AVAILABLE:
-        print("\nPlease install cryptography: pip install cryptography")
+    if not HAS_CRYPTO:
+        print("Please install cryptography: pip install cryptography")
     else:
         send_reading()
