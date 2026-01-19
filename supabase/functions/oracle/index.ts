@@ -342,10 +342,16 @@ async function recordOnStellar(
   timestamp: number
 ): Promise<{ success: boolean; txHash?: string; error?: string }> {
   const stellarSecretKey = Deno.env.get("STELLAR_SECRET_KEY");
+  const stellarNetwork = Deno.env.get("STELLAR_NETWORK") || "testnet";
 
   if (!stellarSecretKey) {
     return { success: false, error: "STELLAR_SECRET_KEY not configured" };
   }
+
+  const isMainnet = stellarNetwork.toLowerCase() === "mainnet";
+  const horizonUrl = isMainnet
+    ? "https://horizon.stellar.org"
+    : "https://horizon-testnet.stellar.org";
 
   try {
     const StellarModule = await import("https://esm.sh/@stellar/stellar-sdk@11.2.2?bundle&target=browser");
@@ -361,14 +367,15 @@ async function recordOnStellar(
       return { success: false, error: "Stellar classes not found in SDK" };
     }
 
-    const server = new HorizonServer("https://horizon-testnet.stellar.org");
+    const networkPassphrase = isMainnet ? Networks.PUBLIC : Networks.TESTNET;
+    const server = new HorizonServer(horizonUrl);
     const sourceKeypair = Keypair.fromSecret(stellarSecretKey);
     const account = await server.loadAccount(sourceKeypair.publicKey());
     const dataKey = `r_${timestamp}`;
 
     const transaction = new TransactionBuilder(account, {
       fee: "100",
-      networkPassphrase: Networks.TESTNET,
+      networkPassphrase,
     })
       .addOperation(
         Operation.manageData({
