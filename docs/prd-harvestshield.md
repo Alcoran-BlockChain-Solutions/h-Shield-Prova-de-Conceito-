@@ -5,10 +5,10 @@
 
 | Campo | Valor |
 |-------|-------|
-| Versão | 1.1 |
-| Data | 2026-01-16 |
+| Versão | 2.0 |
+| Data | 2026-01-20 |
 | Autor | Lucas Oliveira (Olivmath) |
-| Status | Draft |
+| Status | MVP Completo |
 
 ---
 
@@ -210,80 +210,89 @@ CREATE TABLE devices (
 CREATE INDEX idx_devices_device_id ON devices(device_id);
 ```
 
-### RF09 - Dashboard de Visualização (PLANEJADO)
+### RF09 - Dashboard de Visualização (IMPLEMENTADO)
 
-**Descrição:** Página HTML simples para visualização de leituras com filtros e paginação.
+**Descrição:** Dashboard React completo para visualização de leituras com charts e analytics.
 
-**Status:** Não implementado
+**Status:** ✅ Implementado
 
 **Critérios de Aceite:**
-- [ ] Página HTML única (`/dashboard/index.html`) sem build step
-- [ ] Filtro por device_id (dropdown)
-- [ ] Filtro por período (date range)
-- [ ] Paginação (20 itens por página)
-- [ ] Indicador de status blockchain (pending/confirmed/failed)
-- [ ] Link para Stellar Explorer para cada transação
-- [ ] Usa API REST existente (`get-readings`)
+- [x] Dashboard React + Vite + TypeScript (`/dashboard/`)
+- [x] Filtro por device_id (DeviceCard selection)
+- [x] Visualização de leituras em tempo real
+- [x] Paginação (50 itens por página)
+- [x] Indicador de status blockchain (pending/confirmed/failed) - BlockchainStatus.tsx
+- [x] Link para Stellar Explorer para cada transação - TransactionLink.tsx
+- [x] Página de Analytics com charts (SensorLineChart, SensorAreaChart)
+- [x] Theme toggle (dark/light mode) - ThemeContext.tsx
 
-**Stack Planejada:**
-- Vanilla JS + Supabase JS Client
-- Sem framework/build step
-- CSS simples inline ou arquivo único
+**Stack Implementada:**
+- React 18 + Vite + TypeScript
+- Supabase JS Client
+- Recharts para gráficos
+- 12 componentes, 4 hooks customizados
 
-### RF10 - Realtime Subscriptions (PLANEJADO)
+### RF10 - Realtime Subscriptions (IMPLEMENTADO)
 
 **Descrição:** Dashboard atualiza automaticamente quando novos dados são inseridos.
 
-**Status:** Não implementado
+**Status:** ✅ Implementado
 
 **Critérios de Aceite:**
-- [ ] Tabela `readings` com Realtime habilitado via `supabase_realtime` publication
-- [ ] Dashboard subscreve a eventos INSERT na tabela readings
-- [ ] Novos registros aparecem automaticamente (sem refresh manual)
-- [ ] Indicador visual de conexão realtime (conectado/desconectado)
+- [x] Tabela `readings` com Realtime habilitado via `supabase_realtime` publication
+- [x] Dashboard subscreve a eventos INSERT na tabela readings
+- [x] Dashboard subscreve a eventos UPDATE (blockchain status changes)
+- [x] Novos registros aparecem automaticamente (sem refresh manual)
+- [x] Indicador visual de conexão realtime - ConnectionStatus.tsx
 
-**Código Planejado:**
-```javascript
-supabase
-  .channel('readings')
+**Código Implementado (useReadings.ts):**
+```typescript
+// Subscribe to new readings
+const insertChannel = supabase
+  .channel('readings-inserts')
   .on('postgres_changes',
     { event: 'INSERT', schema: 'public', table: 'readings' },
-    (payload) => prependToTable(payload.new)
+    (payload) => prependReading(payload.new as Reading)
+  )
+  .subscribe();
+
+// Subscribe to reading updates (blockchain status changes)
+const updateChannel = supabase
+  .channel('readings-updates')
+  .on('postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'readings' },
+    (payload) => updateReadingStatus(payload.new as Reading)
   )
   .subscribe();
 ```
 
-**Migration Necessária:**
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE readings;
-```
-
-### RF11 - Oracle Assíncrono (PLANEJADO)
+### RF11 - Oracle Assíncrono (IMPLEMENTADO)
 
 **Descrição:** Oracle retorna 202 Accepted imediatamente após validação, processando blockchain em background.
 
-**Status:** Não implementado
+**Status:** ✅ Implementado
 
-**Problema Atual:**
-- Oracle leva ~3 segundos (82% é Stellar TX)
-- IoT fica bloqueado esperando resposta
+**Problema Resolvido:**
+- Oracle anteriormente levava ~3 segundos (82% era Stellar TX)
+- IoT ficava bloqueado esperando resposta
 
-**Solução Proposta:**
+**Solução Implementada:**
 ```
 ANTES: IoT -> [ECDSA] -> [DB] -> [Stellar 2.6s] -> 201 (3s total)
-DEPOIS: IoT -> [ECDSA] -> [DB pending] -> 202 (400ms)
+AGORA: IoT -> [ECDSA] -> [DB pending] -> 202 (400ms)
                               |
                               +--[Background]--> [Stellar] -> [DB update]
 ```
 
 **Critérios de Aceite:**
-- [ ] Retorna 202 Accepted em < 500ms após validação
-- [ ] Salva reading com `blockchain_status: 'pending'`
-- [ ] Processa Stellar TX em background via `EdgeRuntime.waitUntil()`
-- [ ] Atualiza status para `confirmed` ou `failed` após processamento
-- [ ] Nova coluna `blockchain_error` para registrar erros
+- [x] Retorna 202 Accepted em < 500ms após validação
+- [x] Salva reading com `blockchain_status: 'pending'`
+- [x] Processa Stellar TX em background via `EdgeRuntime.waitUntil()`
+- [x] Atualiza status para `confirmed` ou `failed` após processamento
+- [x] Coluna `blockchain_error` para registrar erros (migration 003)
+- [x] Retry logic com exponential backoff para Stellar TX
 
-**Código Chave:**
+**Código Implementado (oracle/index.ts):**
 ```typescript
 // Retorna 202 após validação
 const response = new Response(
@@ -477,16 +486,23 @@ return response;
 - [x] Hash registrado na Stellar Testnet
 - [x] Dados consultáveis via API REST
 - [x] Transação verificável no Stellar Explorer
-- [ ] Documentação completa
-- [ ] Configuração Mainnet/Testnet via ENV VAR funcionando
+- [x] Documentação completa
+- [x] Configuração Mainnet/Testnet via ENV VAR funcionando
 - [x] Autenticação IoT com ECDSA P-256 implementada
 - [x] Tabela de dispositivos provisionados criada
 
-### 9.2 Próximas Iterações (Planejado):
+### 9.2 Funcionalidades Implementadas:
 
-- [ ] Oracle assíncrono com resposta 202 (RF11)
-- [ ] Dashboard de visualização (RF09)
-- [ ] Realtime subscriptions (RF10)
+- [x] Oracle assíncrono com resposta 202 (RF11)
+- [x] Dashboard de visualização React (RF09)
+- [x] Realtime subscriptions (RF10)
+
+### 9.3 Próxima Fase (Phase 2 - Hardware):
+
+- [ ] Implementação de hardware físico com sensores reais
+- [ ] Comunicação LoRaWAN para dispositivos de campo
+- [ ] Gateway central na sede da fazenda
+- [ ] Ver documento: `docs/phase-2-hardware.md`
 
 ### 9.3 Métricas de Validação
 
@@ -527,4 +543,4 @@ return response;
 
 ---
 
-_Documento gerado via BMAD Framework | Atualizado: 2026-01-16_
+_Documento gerado via BMAD Framework | Atualizado: 2026-01-20 | MVP 100% Completo_

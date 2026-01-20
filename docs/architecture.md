@@ -3,50 +3,229 @@
 ## Visão Geral
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           HARVESTSHIELD MVP                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌─────────────┐                    ┌─────────────────────────────────────┐ │
-│  │   ESP32     │                    │            SUPABASE                 │ │
-│  │  SIMULATOR  │                    │                                     │ │
-│  │             │     HTTPS POST     │  ┌───────────────────────────────┐  │ │
-│  │ ┌─────────┐ │ ─────────────────> │  │      EDGE FUNCTION           │  │ │
-│  │ │ WiFi    │ │                    │  │      (Oráculo)               │  │ │
-│  │ │ Client  │ │                    │  │                               │  │ │
-│  │ └─────────┘ │                    │  │  ┌─────────┐  ┌───────────┐  │  │ │
-│  │             │                    │  │  │Validate │->│Normalize  │  │  │ │
-│  │ ┌─────────┐ │                    │  │  └─────────┘  └─────┬─────┘  │  │ │
-│  │ │ Data    │ │                    │  │                     │        │  │ │
-│  │ │Generator│ │                    │  │         ┌───────────┴──────┐ │  │ │
-│  │ └─────────┘ │                    │  │         │                  │ │  │ │
-│  └─────────────┘                    │  │    ┌────▼────┐    ┌────────▼┐│  │ │
-│                                     │  │    │PostgreSQL│   │ Stellar ││  │ │
-│                                     │  │    │   DB    │    │ Testnet ││  │ │
-│                                     │  │    └────┬────┘    └─────────┘│  │ │
-│                                     │  └─────────│────────────────────┘  │ │
-│                                     │            │                       │ │
-│                                     │  ┌─────────▼───────────────────┐  │ │
-│                                     │  │       pg_graphql            │  │ │
-│                                     │  │       (API Layer)           │  │ │
-│                                     │  └─────────────────────────────┘  │ │
-│                                     └─────────────────────────────────────┘ │
-│                                                    │                        │
-│  ┌─────────────┐                                   │                        │
-│  │   CLIENT    │ <─────────────────────────────────┘                        │
-│  │    APP      │              GraphQL                                       │
-│  └─────────────┘                                                            │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              HARVESTSHIELD - ARQUITETURA COMPLETA                        │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌─────────────────┐                    ┌─────────────────────────────────────────────┐  │
+│  │     ESP32       │     HTTPS POST     │                  SUPABASE                   │  │
+│  │   (firmware/)   │ ─────────────────> │                                             │  │
+│  │                 │                    │  ┌───────────────────────────────────────┐  │  │
+│  │ ┌─────────────┐ │   Headers:         │  │        EDGE FUNCTION (Oracle)         │  │  │
+│  │ │ sensors/    │ │   X-Device-ID      │  │                                       │  │  │
+│  │ │ temperature │ │   X-Timestamp      │  │  1. Verify PoW (SHA256, difficulty 3) │  │  │
+│  │ │ humidity_*  │ │   X-PoW-Data       │  │  2. Verify ECDSA P-256 Signature      │  │  │
+│  │ │ luminosity  │ │   X-PoW-Nonce      │  │  3. Anti-replay (5min window)         │  │  │
+│  │ └─────────────┘ │   X-PoW-Hash       │  │  4. Validate ranges                   │  │  │
+│  │                 │   X-Signature      │  │  5. Normalize + SHA256 hash           │  │  │
+│  │ ┌─────────────┐ │                    │  │  6. Save to PostgreSQL                │  │  │
+│  │ │ crypto.cpp  │ │                    │  │  7. Return 202 Accepted               │  │  │
+│  │ │ SHA256+PoW  │ │                    │  │  8. Stellar TX (background)           │  │  │
+│  │ │ ECDSA sign  │ │                    │  └──────────────────┬────────────────────┘  │  │
+│  │ └─────────────┘ │                    │                     │                       │  │
+│  │                 │                    │          ┌──────────┴──────────┐            │  │
+│  │ ┌─────────────┐ │                    │          │                     │            │  │
+│  │ │ key_manager │ │                    │   ┌──────▼──────┐    ┌─────────▼─────────┐  │  │
+│  │ │ NVS storage │ │                    │   │ PostgreSQL  │    │ Stellar Blockchain│  │  │
+│  │ │ MAC→DeviceID│ │                    │   │  (readings  │    │  (testnet/mainnet)│  │  │
+│  │ └─────────────┘ │                    │   │   devices)  │    │                   │  │  │
+│  │                 │                    │   └──────┬──────┘    └───────────────────┘  │  │
+│  │ ┌─────────────┐ │                    │          │                                  │  │
+│  │ │ http_client │ │                    │          │ Realtime (WebSocket)             │  │
+│  │ │retry+backoff│ │                    │          │                                  │  │
+│  │ └─────────────┘ │                    │   ┌──────▼──────┐    ┌───────────────────┐  │  │
+│  └─────────────────┘                    │   │ REST API    │    │ Realtime Channel  │  │  │
+│                                         │   │get-readings │    │ postgres_changes  │  │  │
+│                                         │   └──────┬──────┘    └─────────┬─────────┘  │  │
+│                                         └──────────│────────────────────│─────────────┘  │
+│                                                    │                    │                │
+│                                                    └────────┬───────────┘                │
+│                                                             │                            │
+│  ┌──────────────────────────────────────────────────────────▼──────────────────────────┐ │
+│  │                         DASHBOARD (React + Vite + TypeScript)                        │ │
+│  │                                                                                      │ │
+│  │  ┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────────┐  │ │
+│  │  │     Dashboard       │    │     Analytics       │    │      Components         │  │ │
+│  │  │  - Device list      │    │  - Line charts      │    │  - DeviceCard           │  │ │
+│  │  │  - Reading cards    │    │  - Area charts      │    │  - ReadingCard          │  │ │
+│  │  │  - Realtime updates │    │  - Stat cards       │    │  - BlockchainStatus     │  │ │
+│  │  │  - Connection status│    │  - Theme toggle     │    │  - TransactionLink      │  │ │
+│  │  └─────────────────────┘    └─────────────────────┘    └─────────────────────────┘  │ │
+│  └──────────────────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Componente 1: Supabase Service
+## Componente 1: ESP32 Firmware (C++)
 
-### 1.1 PostgreSQL Schema
+### 1.1 Estrutura do Projeto
+
+```
+firmware/
+├── include/
+│   ├── config.h           # WiFi, Supabase URL, keys
+│   ├── crypto.h           # SHA256, ECDSA sign, PoW
+│   ├── key_manager.h      # NVS secure key storage
+│   ├── sensors.h          # Sensor reading interface
+│   ├── http_client.h      # HTTP POST with retry
+│   ├── time_manager.h     # NTP sync
+│   ├── wifi_manager.h     # WiFi reconnection
+│   ├── led.h              # Status feedback
+│   └── stats.h            # Operation statistics
+├── src/
+│   ├── main.cpp           # Setup + Loop (runCycle)
+│   ├── crypto.cpp         # mbedTLS ECDSA P-256 + SHA256 + PoW
+│   ├── key_manager.cpp    # NVS operations, key generation
+│   ├── sensors.cpp        # Aggregated sensor readings
+│   ├── sensors/           # Individual sensor modules
+│   │   ├── temperature.cpp
+│   │   ├── humidity_air.cpp
+│   │   ├── humidity_soil.cpp
+│   │   └── luminosity.cpp
+│   ├── http_client.cpp    # PoW + Sign + POST with retry
+│   ├── time_manager.cpp   # NTP client
+│   ├── wifi_manager.cpp   # WiFi management
+│   ├── led.cpp            # LED patterns
+│   └── stats.cpp          # Stats persistence
+└── platformio.ini
+```
+
+### 1.2 Fluxo de Segurança
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     ESP32 SECURITY FLOW                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  1. Generate sensor data                                            │
+│     │                                                               │
+│     ▼                                                               │
+│  2. Create JSON payload                                             │
+│     │                                                               │
+│     ▼                                                               │
+│  3. Compute Proof of Work (SHA256, difficulty=3)                    │
+│     │  - Hash: SHA256(data + nonce)                                 │
+│     │  - Find nonce where hash starts with "000"                    │
+│     │  - ~4096 attempts average                                     │
+│     │                                                               │
+│     ▼                                                               │
+│  4. Sign with ECDSA P-256                                           │
+│     │  - Private key stored in NVS                                  │
+│     │  - Sign SHA256(payload)                                       │
+│     │  - Convert DER → P1363 format                                 │
+│     │                                                               │
+│     ▼                                                               │
+│  5. Send HTTPS POST with headers                                    │
+│     - X-Device-ID: MAC-based identifier                             │
+│     - X-Timestamp: Unix timestamp (NTP synced)                      │
+│     - X-PoW-Data: Original data for PoW                             │
+│     - X-PoW-Nonce: Found nonce                                      │
+│     - X-PoW-Hash: Resulting hash                                    │
+│     - X-Signature: ECDSA signature (base64)                         │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.3 Key Manager
+
+```cpp
+// key_manager.cpp - Secure key storage using ESP32 NVS
+class KeyManager {
+    // Generates ECDSA P-256 keypair on first boot
+    // Stores private key in NVS (Non-Volatile Storage)
+    // Exports public key in PEM format for registration
+    // Device ID derived from MAC address
+};
+```
+
+---
+
+## Componente 2: Supabase Edge Functions
+
+### 2.1 Oracle Function (oracle/index.ts)
+
+**Versão:** v0.13 - Async Stellar com retry
+
+```typescript
+// Fluxo principal
+async function handleRequest(req: Request): Promise<Response> {
+  // 1. Extract headers
+  const deviceId = req.headers.get('X-Device-ID');
+  const timestamp = req.headers.get('X-Timestamp');
+  const powData = req.headers.get('X-PoW-Data');
+  const powNonce = req.headers.get('X-PoW-Nonce');
+  const powHash = req.headers.get('X-PoW-Hash');
+  const signature = req.headers.get('X-Signature');
+
+  // 2. Verify Proof of Work
+  if (!verifyPoW(powData, powNonce, powHash, DIFFICULTY)) {
+    return new Response('Invalid PoW', { status: 400 });
+  }
+
+  // 3. Verify timestamp (anti-replay, 5 min window)
+  if (!isTimestampValid(timestamp, 5 * 60 * 1000)) {
+    return new Response('Timestamp expired', { status: 400 });
+  }
+
+  // 4. Get device public key and verify signature
+  const device = await getDevice(deviceId);
+  if (!verifySignature(payload, signature, device.public_key)) {
+    return new Response('Invalid signature', { status: 401 });
+  }
+
+  // 5. Validate and normalize data
+  const normalized = normalize(payload);
+  const dataHash = sha256(JSON.stringify(normalized));
+
+  // 6. Save to PostgreSQL with status: 'pending'
+  const reading = await saveReading(normalized, dataHash);
+
+  // 7. Return 202 Accepted immediately
+  const response = new Response(
+    JSON.stringify({ success: true, reading_id: reading.id }),
+    { status: 202 }
+  );
+
+  // 8. Process Stellar in background
+  EdgeRuntime.waitUntil(processBlockchain(reading.id, dataHash));
+
+  return response;
+}
+```
+
+### 2.2 REST API (get-readings/index.ts)
+
+**Versão:** v0.4 - Filtros + Paginação
+
+```typescript
+// GET /get-readings?device_id=xxx&limit=50&offset=0
+async function handleRequest(req: Request): Promise<Response> {
+  const { device_id, limit = 50, offset = 0 } = getQueryParams(req);
+
+  let query = supabase
+    .from('readings')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+    .range(offset, offset + limit - 1);
+
+  if (device_id) {
+    query = query.eq('device_id', device_id);
+  }
+
+  const { data, error } = await query;
+  return new Response(JSON.stringify(data));
+}
+```
+
+---
+
+## Componente 3: PostgreSQL Schema
+
+### 3.1 Tabela: readings
 
 ```sql
--- Tabela principal de leituras
 CREATE TABLE readings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     device_id VARCHAR(50) NOT NULL,
@@ -54,10 +233,12 @@ CREATE TABLE readings (
     humidity_air DECIMAL(5,2),
     humidity_soil DECIMAL(5,2),
     luminosity INTEGER,
-    raw_data JSONB,
-    normalized_at TIMESTAMPTZ DEFAULT NOW(),
+    data_hash VARCHAR(64),
+    pow_hash VARCHAR(64),
+    pow_nonce BIGINT,
     blockchain_tx_hash VARCHAR(64),
     blockchain_status VARCHAR(20) DEFAULT 'pending',
+    blockchain_error TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -66,223 +247,68 @@ CREATE INDEX idx_readings_device_id ON readings(device_id);
 CREATE INDEX idx_readings_created_at ON readings(created_at DESC);
 CREATE INDEX idx_readings_blockchain_status ON readings(blockchain_status);
 
--- Row Level Security
+-- RLS
 ALTER TABLE readings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read" ON readings FOR SELECT USING (true);
+CREATE POLICY "Service write" ON readings FOR INSERT WITH CHECK (true);
+CREATE POLICY "Service update" ON readings FOR UPDATE USING (true);
 
--- Política de leitura pública
-CREATE POLICY "Public read access" ON readings
-    FOR SELECT USING (true);
-
--- Política de insert via service role
-CREATE POLICY "Service insert" ON readings
-    FOR INSERT WITH CHECK (true);
+-- Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE readings;
 ```
 
-### 1.2 Edge Function - Oráculo
+### 3.2 Tabela: devices
 
-```
-supabase/functions/
-└── oracle/
-    ├── index.ts          # Entry point
-    ├── validator.ts      # Validação de dados
-    ├── normalizer.ts     # Normalização
-    ├── stellar.ts        # Integração blockchain
-    └── types.ts          # Type definitions
-```
+```sql
+CREATE TABLE devices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id VARCHAR(50) UNIQUE NOT NULL,
+    public_key TEXT NOT NULL,
+    name VARCHAR(100),
+    location VARCHAR(200),
+    active BOOLEAN DEFAULT true,
+    last_seen_at TIMESTAMPTZ,
+    total_readings BIGINT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-**Fluxo da Edge Function:**
-
-```
-Request -> Validate -> Normalize -> [DB Insert + Stellar Record] -> Response
-```
-
----
-
-## Componente 2: Stellar Integration
-
-### 2.1 Estrutura de Dados na Blockchain
-
-Usando **Manage Data** operation da Stellar:
-
-```typescript
-interface StellarDataEntry {
-  key: string;      // "reading_{timestamp}"
-  value: string;    // Hash SHA256 dos dados normalizados
-}
-```
-
-### 2.2 Fluxo de Registro
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Dados      │ --> │   SHA256     │ --> │   Manage     │
-│ Normalizados │     │    Hash      │     │    Data      │
-└──────────────┘     └──────────────┘     └──────────────┘
-                                                 │
-                                                 ▼
-                                          ┌──────────────┐
-                                          │   Stellar    │
-                                          │   Testnet    │
-                                          └──────────────┘
-```
-
-### 2.3 Configuração Stellar
-
-```typescript
-// stellar.ts
-import { Keypair, Server, TransactionBuilder, Operation, Networks } from 'stellar-sdk';
-
-const server = new Server('https://horizon-testnet.stellar.org');
-const sourceKeypair = Keypair.fromSecret(Deno.env.get('STELLAR_SECRET_KEY')!);
-
-export async function recordOnBlockchain(dataHash: string, timestamp: number): Promise<string> {
-  const account = await server.loadAccount(sourceKeypair.publicKey());
-
-  const transaction = new TransactionBuilder(account, {
-    fee: '100',
-    networkPassphrase: Networks.TESTNET
-  })
-    .addOperation(Operation.manageData({
-      name: `reading_${timestamp}`,
-      value: dataHash
-    }))
-    .setTimeout(30)
-    .build();
-
-  transaction.sign(sourceKeypair);
-  const result = await server.submitTransaction(transaction);
-
-  return result.hash;
-}
+CREATE INDEX idx_devices_device_id ON devices(device_id);
 ```
 
 ---
 
-## Componente 3: Serviço de Normalização
+## Componente 4: Stellar Integration
 
-### 3.1 Regras de Validação
-
-```typescript
-// validator.ts
-interface RawReading {
-  device_id: string;
-  temperature?: number;
-  humidity_air?: number;
-  humidity_soil?: number;
-  luminosity?: number;
-  timestamp?: number;
-}
-
-const VALIDATION_RULES = {
-  temperature: { min: -40, max: 60 },
-  humidity_air: { min: 0, max: 100 },
-  humidity_soil: { min: 0, max: 100 },
-  luminosity: { min: 0, max: 120000 }
-};
-
-export function validate(data: RawReading): ValidationResult {
-  // Implementação...
-}
-```
-
-### 3.2 Normalização
+### 4.1 ManageData Operation
 
 ```typescript
-// normalizer.ts
-interface NormalizedReading {
-  device_id: string;
-  temperature: number;      // Celsius, 2 decimal places
-  humidity_air: number;     // Percentage, 2 decimal places
-  humidity_soil: number;    // Percentage, 2 decimal places
-  luminosity: number;       // Lux, integer
-  timestamp: number;        // Unix timestamp
-  hash: string;             // SHA256 of normalized data
-}
-
-export function normalize(validated: ValidatedReading): NormalizedReading {
-  const normalized = {
-    device_id: validated.device_id.trim().toLowerCase(),
-    temperature: parseFloat(validated.temperature.toFixed(2)),
-    humidity_air: parseFloat(validated.humidity_air.toFixed(2)),
-    humidity_soil: parseFloat(validated.humidity_soil.toFixed(2)),
-    luminosity: Math.round(validated.luminosity),
-    timestamp: validated.timestamp || Date.now()
-  };
-
-  return {
-    ...normalized,
-    hash: generateHash(normalized)
-  };
-}
+// Stellar record structure
+const transaction = new TransactionBuilder(account, {
+  fee: '100',
+  networkPassphrase: NETWORK === 'mainnet'
+    ? Networks.PUBLIC
+    : Networks.TESTNET
+})
+  .addOperation(Operation.manageData({
+    name: `r_${timestamp}`,           // Key: r_1705123456789
+    value: `${powHash}:${nonce}`      // Value: hash:nonce
+  }))
+  .addMemo(Memo.text(deviceId.slice(0, 28)))
+  .setTimeout(30)
+  .build();
 ```
 
----
+### 4.2 Retry Logic
 
-## Componente 4: GraphQL API
-
-### 4.1 Configuração pg_graphql
-
-O Supabase já vem com pg_graphql habilitado. Basta:
-
-1. Criar as tabelas com os tipos corretos
-2. Configurar RLS
-3. Acessar via endpoint GraphQL
-
-**Endpoint:** `https://<project>.supabase.co/graphql/v1`
-
-### 4.2 Queries Disponíveis
-
-```graphql
-# Listar todas as leituras
-query GetReadings {
-  readingsCollection(
-    orderBy: [{ created_at: DescNullsLast }]
-    first: 100
-  ) {
-    edges {
-      node {
-        id
-        device_id
-        temperature
-        humidity_air
-        humidity_soil
-        luminosity
-        blockchain_tx_hash
-        created_at
-      }
-    }
-  }
-}
-
-# Leituras por dispositivo
-query GetDeviceReadings($deviceId: String!) {
-  readingsCollection(
-    filter: { device_id: { eq: $deviceId } }
-    orderBy: [{ created_at: DescNullsLast }]
-  ) {
-    edges {
-      node {
-        id
-        temperature
-        humidity_air
-        created_at
-      }
-    }
-  }
-}
-
-# Verificar registro blockchain
-query VerifyBlockchain($txHash: String!) {
-  readingsCollection(
-    filter: { blockchain_tx_hash: { eq: $txHash } }
-  ) {
-    edges {
-      node {
-        id
-        raw_data
-        blockchain_tx_hash
-        blockchain_status
-      }
+```typescript
+async function submitWithRetry(tx: Transaction, maxRetries = 3): Promise<string> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const result = await server.submitTransaction(tx);
+      return result.hash;
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      await delay(1000 * (i + 1)); // Exponential backoff
     }
   }
 }
@@ -290,145 +316,106 @@ query VerifyBlockchain($txHash: String!) {
 
 ---
 
-## Componente 5: ESP32 Firmware
+## Componente 5: Dashboard (React + Vite)
 
 ### 5.1 Estrutura do Projeto
 
 ```
-firmware/
+dashboard/
 ├── src/
-│   ├── main.cpp
-│   ├── config.h
-│   ├── wifi_manager.cpp
-│   ├── data_generator.cpp
-│   ├── http_client.cpp
-│   └── led_status.cpp
-├── platformio.ini
-└── README.md
+│   ├── main.tsx                    # Entry point
+│   ├── App.tsx                     # Router + Layout
+│   ├── pages/
+│   │   ├── Dashboard.tsx           # Main view with devices and readings
+│   │   └── Analytics.tsx           # Charts and statistics
+│   ├── components/
+│   │   ├── Layout.tsx              # App shell
+│   │   ├── DeviceCard.tsx          # Device info
+│   │   ├── DeviceStatusBadge.tsx   # Online/offline indicator
+│   │   ├── ReadingCard.tsx         # Sensor reading display
+│   │   ├── ReadingMetrics.tsx      # Metrics visualization
+│   │   ├── BlockchainStatus.tsx    # TX status + error modal
+│   │   ├── TransactionLink.tsx     # Stellar explorer link
+│   │   ├── StellarExplorer.tsx     # Explorer integration
+│   │   ├── ConnectionStatus.tsx    # Realtime connection
+│   │   └── charts/
+│   │       ├── StatCard.tsx
+│   │       ├── SensorLineChart.tsx
+│   │       └── SensorAreaChart.tsx
+│   ├── hooks/
+│   │   ├── useDevices.ts           # Device data + realtime
+│   │   ├── useReadings.ts          # Readings + realtime subscriptions
+│   │   ├── useAnalyticsData.ts     # Aggregated analytics
+│   │   └── useRelativeTime.ts      # Time formatting
+│   ├── contexts/
+│   │   └── ThemeContext.tsx        # Dark/light mode
+│   ├── config/
+│   │   ├── supabase.ts             # Supabase client
+│   │   └── constants.ts
+│   ├── types/
+│   │   ├── device.ts
+│   │   └── reading.ts
+│   └── utils/
+│       ├── statistics.ts
+│       ├── colors.ts
+│       └── time.ts
+└── package.json
 ```
 
-### 5.2 Data Generator
+### 5.2 Realtime Subscriptions
 
-```cpp
-// data_generator.cpp
-#include "data_generator.h"
+```typescript
+// useReadings.ts - Real-time data updates
+useEffect(() => {
+  // Subscribe to new readings
+  const insertChannel = supabase
+    .channel('readings-inserts')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'readings' },
+      (payload) => prependReading(payload.new as Reading)
+    )
+    .subscribe();
 
-struct SensorData {
-  float temperature;
-  float humidity_air;
-  float humidity_soil;
-  int luminosity;
-};
+  // Subscribe to reading updates (blockchain status changes)
+  const updateChannel = supabase
+    .channel('readings-updates')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'readings' },
+      (payload) => updateReadingStatus(payload.new as Reading)
+    )
+    .subscribe();
 
-SensorData generateRealisticData() {
-  static float lastTemp = 25.0;
-  static float lastHumAir = 60.0;
-  static float lastHumSoil = 50.0;
-
-  // Variação realista baseada na hora do dia
-  int hour = getHour();
-
-  // Temperatura: mais quente durante o dia
-  float tempVariation = random(-20, 20) / 10.0;
-  if (hour >= 10 && hour <= 16) {
-    tempVariation += 0.5;
-  } else if (hour >= 0 && hour <= 6) {
-    tempVariation -= 0.3;
-  }
-  lastTemp = constrain(lastTemp + tempVariation, 15.0, 35.0);
-
-  // Umidade ar: inverso da temperatura
-  float humVariation = random(-50, 50) / 10.0;
-  lastHumAir = constrain(lastHumAir + humVariation, 40.0, 90.0);
-
-  // Umidade solo: variação mais lenta
-  float soilVariation = random(-30, 30) / 10.0;
-  lastHumSoil = constrain(lastHumSoil + soilVariation, 20.0, 80.0);
-
-  // Luminosidade: ciclo diurno
-  int baseLux = 0;
-  if (hour >= 6 && hour <= 18) {
-    baseLux = map(hour <= 12 ? hour - 6 : 18 - hour, 0, 6, 1000, 65000);
-  }
-  int lux = baseLux + random(-1000, 1000);
-
-  return {lastTemp, lastHumAir, lastHumSoil, max(0, lux)};
-}
-```
-
-### 5.3 HTTP Client
-
-```cpp
-// http_client.cpp
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
-
-bool sendToOracle(SensorData data, const char* deviceId) {
-  HTTPClient http;
-
-  http.begin(ORACLE_URL);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("Authorization", "Bearer " + String(SUPABASE_ANON_KEY));
-
-  StaticJsonDocument<256> doc;
-  doc["device_id"] = deviceId;
-  doc["temperature"] = data.temperature;
-  doc["humidity_air"] = data.humidity_air;
-  doc["humidity_soil"] = data.humidity_soil;
-  doc["luminosity"] = data.luminosity;
-  doc["timestamp"] = getUnixTimestamp();
-
-  String payload;
-  serializeJson(doc, payload);
-
-  int httpCode = http.POST(payload);
-  http.end();
-
-  return httpCode == 200 || httpCode == 201;
-}
+  return () => {
+    supabase.removeChannel(insertChannel);
+    supabase.removeChannel(updateChannel);
+  };
+}, []);
 ```
 
 ---
 
-## Componente 6: Integração E2E
+## Componente 6: Segurança
 
-### 6.1 Fluxo Completo
+### 6.1 Camadas de Segurança
+
+| Camada | Mecanismo | Implementação |
+|--------|-----------|---------------|
+| **Autenticação** | ECDSA P-256 | Chave privada em NVS, assinatura DER→P1363 |
+| **Anti-Sybil** | Proof of Work | SHA256 com dificuldade 3 (~4096 tentativas) |
+| **Anti-Replay** | Timestamp | Janela de 5 minutos, verificação server-side |
+| **Autorização** | RLS PostgreSQL | service_role para write, public para read |
+| **Integridade** | SHA256 Hash | Hash dos dados normalizados |
+| **Imutabilidade** | Stellar ManageData | Registro permanente do PoW hash + nonce |
+| **Transporte** | HTTPS/TLS | Certificado válido obrigatório |
+
+### 6.2 Fluxo de Verificação
 
 ```
-┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐
-│  ESP32  │───>│ Oracle  │───>│Normalize│───>│PostgreSQL│   │ Client  │
-│Generate │    │Validate │    │  Hash   │    │  Store  │<──│  Query  │
-└─────────┘    └─────────┘    └────┬────┘    └─────────┘   └─────────┘
-                                   │
-                                   ▼
-                              ┌─────────┐
-                              │ Stellar │
-                              │ Record  │
-                              └─────────┘
-```
-
-### 6.2 Payload de Comunicação
-
-**ESP32 -> Oracle (Request):**
-```json
-{
-  "device_id": "esp32-farm-001",
-  "temperature": 28.5,
-  "humidity_air": 65.2,
-  "humidity_soil": 45.8,
-  "luminosity": 32000,
-  "timestamp": 1736784000
-}
-```
-
-**Oracle -> ESP32 (Response):**
-```json
-{
-  "success": true,
-  "reading_id": "uuid-here",
-  "blockchain_tx": "stellar-tx-hash",
-  "normalized_hash": "sha256-hash"
-}
+Request → [1. PoW Check] → [2. Timestamp Check] → [3. Signature Check] → Process
+              ↓                    ↓                      ↓
+           400 Bad              400 Bad               401 Unauthorized
 ```
 
 ---
@@ -446,19 +433,19 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```env
 STELLAR_SECRET_KEY=S...
 STELLAR_PUBLIC_KEY=G...
-STELLAR_NETWORK=testnet
+STELLAR_NETWORK=testnet  # or mainnet
 ```
 
-### ESP32
+### ESP32 (config.h)
 ```cpp
 #define WIFI_SSID "your-wifi"
 #define WIFI_PASSWORD "your-password"
 #define ORACLE_URL "https://xxx.supabase.co/functions/v1/oracle"
-#define SUPABASE_ANON_KEY "eyJ..."
-#define DEVICE_ID "esp32-farm-001"
+#define DEVICE_ID "auto"  // Uses MAC address
 #define SEND_INTERVAL_MS 60000
+#define POW_DIFFICULTY 3
 ```
 
 ---
 
-_Documento gerado em 2026-01-13 | HarvestShield Architecture v1.0_
+_Documento atualizado em 2026-01-20 | HarvestShield Architecture v2.0_
