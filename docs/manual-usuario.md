@@ -15,7 +15,7 @@ HarvestShield é um sistema de monitoramento agrícola com IoT e blockchain que 
 ```
 ┌─────────────────┐          ┌─────────────────────┐          ┌─────────────────┐
 │     ESP32       │  HTTPS   │    Supabase         │          │    Dashboard    │
-│   (Sensores)    │ ───────> │  (Oracle + DB)      │ <─────── │    (React)      │
+│   (Sensores)    │ ───────> │  (Oracle + DB)      │ ───────> │    (React)      │
 │                 │          │        │            │ Realtime │                 │
 │  PoW + ECDSA    │          │        ▼            │          │  Visualização   │
 └─────────────────┘          │  Stellar Blockchain │          │  Gráficos       │
