@@ -147,7 +147,7 @@ firmware/
 supabase/
 ├── functions/
 │   ├── oracle/
-│   │   └── index.ts       # v0.13 - PoW + ECDSA + Async Stellar
+│   │   └── index.ts       # v0.14 - PoW + ECDSA + Async Stellar
 │   └── get-readings/
 │       └── index.ts       # v0.4 - REST API com filtros
 ├── migrations/
@@ -266,4 +266,4 @@ Nada! Projeto 100% completo.
 │ Dashboard Hooks          │ 4             │
 └──────────────────────────┴───────────────┘
 
-_Atualizado: 2026-01-20_
+_Atualizado: 2026-01-23_

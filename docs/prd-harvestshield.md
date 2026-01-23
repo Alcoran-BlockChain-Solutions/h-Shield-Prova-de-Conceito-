@@ -6,7 +6,7 @@
 | Campo | Valor |
 |-------|-------|
 | Versão | 2.0 |
-| Data | 2026-01-20 |
+| Data | 2026-01-23 |
 | Autor | Lucas Oliveira (Olivmath) |
 | Status | MVP Completo |
 
@@ -73,7 +73,7 @@ Sistema de monitoramento climático que:
 - [ ] Umidade do ar varia entre 40% e 90% (±5%/hora)
 - [ ] Luminosidade segue ciclo diurno (0 a 65.000 Lux)
 - [ ] Umidade do solo varia entre 20% e 80% (±3%/hora)
-- [ ] Dados enviados em intervalo configurável (default: 60s)
+- [x] Dados enviados em intervalo configurável (default: 15s)
 
 ### RF02 - Recepção e Validação de Dados
 
@@ -168,9 +168,11 @@ Sistema de monitoramento climático que:
 
 **Headers de Autenticação:**
 - `X-Device-ID`: Identificador do dispositivo
-- `X-Signature`: Assinatura ECDSA (DER format, base64)
-- `X-Data-Hash`: Hash SHA-256 do payload
-- `X-Timestamp`: Timestamp Unix (opcional, para anti-replay)
+- `X-Timestamp`: Timestamp Unix (obrigatório para anti-replay)
+- `X-PoW-Data`: String serializada dos dados para PoW
+- `X-PoW-Nonce`: Nonce que resolve o PoW
+- `X-PoW-Hash`: SHA256(data + nonce) - deve começar com "000"
+- `X-Signature`: Assinatura ECDSA do PoW hash (DER format, base64)
 
 **Fluxo de Autenticação:**
 
@@ -543,4 +545,4 @@ return response;
 
 ---
 
-_Documento gerado via BMAD Framework | Atualizado: 2026-01-20 | MVP 100% Completo_
+_Documento gerado via BMAD Framework | Atualizado: 2026-01-23 | MVP 100% Completo_

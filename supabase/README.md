@@ -111,18 +111,11 @@ curl -X POST \
 > **Nota:** O ESP32 calcula automaticamente PoW (SHA256 com dificuldade 3) e assina com ECDSA.
 
 **Resposta:**
-```json
-{
-  "success": true,
-  "reading_id": "uuid-here",
-  "normalized_hash": "sha256-hash",
-  "blockchain": {
-    "success": true,
-    "tx_hash": "stellar-tx-hash",
-    "error": null
-  }
-}
 ```
+HTTP/1.1 202 Accepted
+```
+
+> **Nota:** O oracle retorna 202 Accepted sem body. O processamento blockchain ocorre em background via `EdgeRuntime.waitUntil()`. Consulte a tabela `readings` para verificar o status (`blockchain_status`: pending → confirmed/failed).
 
 ### Recuperar Leituras
 

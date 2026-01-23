@@ -92,3 +92,7 @@ X-Device-ID, X-Timestamp, X-PoW-Data, X-PoW-Nonce, X-PoW-Hash, X-Signature
 | DB migrations | `supabase/migrations/*.sql` |
 | Dashboard page | `dashboard/src/pages/Dashboard.tsx` |
 | Progress tracking | `STATUS.md` |
+| User manual | `docs/manual-usuario.md` |
+| Architecture | `docs/architecture.md` |
+| PRD | `docs/prd-harvestshield.md` |
+| Phase 2 hardware | `docs/phase-2-hardware.md` |

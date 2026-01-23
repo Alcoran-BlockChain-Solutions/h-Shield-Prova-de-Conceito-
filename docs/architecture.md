@@ -64,7 +64,8 @@
 ```
 firmware/
 ├── include/
-│   ├── config.h           # WiFi, Supabase URL, keys
+│   ├── config.example.h   # Template de configuração
+│   ├── config.h           # WiFi, Supabase URL, keys (gitignored)
 │   ├── crypto.h           # SHA256, ECDSA sign, PoW
 │   ├── key_manager.h      # NVS secure key storage
 │   ├── sensors.h          # Sensor reading interface
@@ -72,17 +73,23 @@ firmware/
 │   ├── time_manager.h     # NTP sync
 │   ├── wifi_manager.h     # WiFi reconnection
 │   ├── led.h              # Status feedback
-│   └── stats.h            # Operation statistics
+│   ├── stats.h            # Operation statistics
+│   ├── app_controller.h   # Main application control
+│   └── error_types.h      # Error type definitions
 ├── src/
 │   ├── main.cpp           # Setup + Loop (runCycle)
 │   ├── crypto.cpp         # mbedTLS ECDSA P-256 + SHA256 + PoW
 │   ├── key_manager.cpp    # NVS operations, key generation
+│   ├── app_controller.cpp # Application state machine
 │   ├── sensors.cpp        # Aggregated sensor readings
 │   ├── sensors/           # Individual sensor modules
-│   │   ├── temperature.cpp
-│   │   ├── humidity_air.cpp
-│   │   ├── humidity_soil.cpp
-│   │   └── luminosity.cpp
+│   │   ├── temperature.cpp/h
+│   │   ├── humidity_air.cpp/h
+│   │   ├── humidity_soil.cpp/h
+│   │   └── luminosity.cpp/h
+│   ├── transport/         # HTTP transport layer
+│   │   ├── payload_builder.cpp/h
+│   │   └── request_sender.cpp/h
 │   ├── http_client.cpp    # PoW + Sign + POST with retry
 │   ├── time_manager.cpp   # NTP client
 │   ├── wifi_manager.cpp   # WiFi management
@@ -145,7 +152,7 @@ class KeyManager {
 
 ### 2.1 Oracle Function (oracle/index.ts)
 
-**Versão:** v0.13 - Async Stellar com retry
+**Versão:** v0.14 - Async Stellar com retry
 
 ```typescript
 // Fluxo principal
@@ -442,10 +449,10 @@ STELLAR_NETWORK=testnet  # or mainnet
 #define WIFI_PASSWORD "your-password"
 #define ORACLE_URL "https://xxx.supabase.co/functions/v1/oracle"
 #define DEVICE_ID "auto"  // Uses MAC address
-#define SEND_INTERVAL_MS 60000
+#define SEND_INTERVAL_MS 15000  // 15 segundos entre leituras
 #define POW_DIFFICULTY 3
 ```
 
 ---
 
-_Documento atualizado em 2026-01-20 | HarvestShield Architecture v2.0_
+_Documento atualizado em 2026-01-23 | HarvestShield Architecture v2.1_
