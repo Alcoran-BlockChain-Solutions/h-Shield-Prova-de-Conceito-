@@ -3,41 +3,57 @@ import {
   Deck, Slide, Heading, Text, Box, FlexBox, Appear, Notes,
 } from 'spectacle'
 
-// ─── Configuração do dashboard (altere para a URL em produção) ────────────────
-const DASHBOARD_URL = 'http://localhost:3000'
+// ─── Dashboard URL ─────────────────────────────────────────────────────────────
+const DASHBOARD_URL = 'http://localhost:3004'
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
+// ─── IBM Carbon Design System — Dark G100 ──────────────────────────────────────
 const C = {
-  primary: '#0EA674',           // corporate green — dominant
-  accent:  '#34D399',           // light green — highlights
-  muted:   '#065F46',           // dark green — card borders / backgrounds
-  red:     '#EF4444',           // problem slides only
-  dark:    '#07090F',
-  darker:  '#030508',
-  card:    'rgba(255,255,255,0.04)',
-  border:  'rgba(14,166,116,0.18)',
-  white:   '#F0EDE8',
-  dim:     'rgba(240,237,232,0.50)',
+  // Surfaces
+  bg:       '#161616',   // IBM Gray-100
+  surface:  '#262626',   // IBM Gray-90
+  surface2: '#353535',   // IBM Gray-80 — hover
+  border:   '#393939',   // IBM Gray-70
+
+  // IBM Blue — the ONLY accent
+  blue:     '#0f62fe',   // IBM Blue-60
+  blueHov:  '#0353e9',   // IBM Blue-70
+  blueLt:   '#4589ff',   // IBM Blue-50 — secondary/links
+  blueDim:  'rgba(15, 98, 254, 0.12)',
+
+  // Text
+  text:     '#f4f4f4',   // IBM Gray-10
+  dim:      'rgba(244, 244, 244, 0.55)',
+  muted:    '#8d8d8d',   // IBM Gray-40
+
+  // Status
+  red:      '#fa4d56',   // IBM Red-40
+  green:    '#42be65',   // IBM Green-40
+  yellow:   '#f1c21b',   // IBM Yellow-30
+
+  // Card
+  card:     'rgba(38, 38, 38, 0.95)',
+  cardBorder: 'rgba(57, 57, 57, 0.8)',
 }
 
 const FONT = {
-  display: '"Bebas Neue", Impact, sans-serif',
+  display: '"IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif',
   body:    '"IBM Plex Sans", system-ui, sans-serif',
-  mono:    '"Space Mono", monospace',
+  mono:    '"IBM Plex Mono", monospace',
 }
 
+// IBM Carbon — very subtle background patterns
 const BG = {
-  dots: `radial-gradient(circle, rgba(14,166,116,0.11) 1px, transparent 1px)`,
-  grid: `linear-gradient(rgba(14,166,116,0.05) 1px, transparent 1px),
-         linear-gradient(90deg, rgba(14,166,116,0.05) 1px, transparent 1px)`,
+  dots: `radial-gradient(circle, rgba(15,98,254,0.06) 1px, transparent 1px)`,
+  grid: `linear-gradient(rgba(57,57,57,0.5) 1px, transparent 1px),
+         linear-gradient(90deg, rgba(57,57,57,0.5) 1px, transparent 1px)`,
 }
 
-// ─── Spectacle theme ──────────────────────────────────────────────────────────
+// ─── Spectacle theme ────────────────────────────────────────────────────────────
 const theme = {
   colors: {
-    primary:   C.white,
-    secondary: C.primary,
-    tertiary:  C.dark,
+    primary:   C.text,
+    secondary: C.blue,
+    tertiary:  C.bg,
   },
   fonts: {
     header:    FONT.display,
@@ -45,40 +61,48 @@ const theme = {
     monospace: FONT.mono,
   },
   fontSizes: {
-    h1: '80px', h2: '56px', h3: '40px', h4: '28px',
-    text: '22px', monospace: '18px',
+    h1: '72px', h2: '48px', h3: '36px', h4: '24px',
+    text: '20px', monospace: '16px',
   },
   space: [8, 16, 24, 32, 48, 64],
 }
 
-// ─── Micro-components ─────────────────────────────────────────────────────────
+// ─── Micro-components — IBM Carbon visual language ──────────────────────────────
 
-const Label = ({ children, color = C.primary }) => (
+// Eyebrow label above headings
+const Label = ({ children, color = C.blue }) => (
   <div style={{
     fontFamily: FONT.mono,
     fontSize: '11px',
-    letterSpacing: '3px',
+    letterSpacing: '2px',
     textTransform: 'uppercase',
     color,
-    marginBottom: '16px',
+    marginBottom: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
   }}>
+    <span style={{ opacity: 0.5 }}>—</span>
     {children}
   </div>
 )
 
-const Bar = ({ color = C.primary, width = '56px' }) => (
-  <div style={{ height: '2px', width, background: color, margin: '20px 0' }} />
+// IBM Carbon — horizontal rule
+const Rule = ({ color = C.blue, width = '48px' }) => (
+  <div style={{ height: '2px', width, background: color, margin: '18px 0' }} />
 )
 
-const Tag = ({ children, color = C.primary }) => (
+// IBM Carbon — tag component
+const Tag = ({ children, color = C.blue }) => (
   <div style={{
     display: 'inline-block',
-    border: `1px solid ${color}55`,
-    color: `${color}CC`,
+    background: `rgba(15,98,254,0.10)`,
+    border: `1px solid rgba(15,98,254,0.25)`,
+    color: C.blueLt,
     fontFamily: FONT.mono,
     fontSize: '11px',
-    letterSpacing: '2px',
-    padding: '4px 12px',
+    letterSpacing: '1px',
+    padding: '3px 10px',
     borderRadius: '2px',
     textTransform: 'uppercase',
   }}>
@@ -86,52 +110,53 @@ const Tag = ({ children, color = C.primary }) => (
   </div>
 )
 
-const StatCard = ({ value, label, accent = C.primary }) => (
+// IBM Carbon — stat card
+const StatCard = ({ value, label, accent = C.blue }) => (
   <div style={{
     flex: 1,
     background: C.card,
-    border: `1px solid ${accent}25`,
+    border: `1px solid ${C.border}`,
     borderTop: `2px solid ${accent}`,
-    borderRadius: '3px',
     padding: '28px 24px',
   }}>
     <div style={{
       fontFamily: FONT.display,
-      fontSize: '62px',
+      fontWeight: 700,
+      fontSize: '56px',
       color: accent,
       lineHeight: 1,
       marginBottom: '10px',
+      letterSpacing: '-0.5px',
     }}>
       {value}
     </div>
     <div style={{
-      fontFamily: FONT.mono,
-      fontSize: '11px',
+      fontFamily: FONT.body,
+      fontSize: '13px',
       color: C.dim,
-      letterSpacing: '1px',
-      textTransform: 'uppercase',
       lineHeight: 1.5,
+      fontWeight: 400,
     }}>
       {label}
     </div>
   </div>
 )
 
-const FlowNode = ({ label, sub, accent = C.primary, highlighted = false }) => (
+// IBM Carbon — flow node
+const FlowNode = ({ label, sub, accent = C.blue, highlighted = false }) => (
   <div style={{
-    background: highlighted ? `${accent}14` : C.card,
-    border: `1px solid ${highlighted ? accent : `${accent}28`}`,
-    borderRadius: '3px',
-    padding: '18px 14px',
+    background: highlighted ? `rgba(15,98,254,0.12)` : C.surface,
+    border: `1px solid ${highlighted ? C.blue : C.border}`,
+    padding: '16px 14px',
     textAlign: 'center',
-    minWidth: '118px',
+    minWidth: '110px',
   }}>
     <div style={{
       fontFamily: FONT.mono,
       fontSize: '11px',
-      color: accent,
+      color: highlighted ? C.blue : C.muted,
       letterSpacing: '1px',
-      fontWeight: 700,
+      fontWeight: 500,
       textTransform: 'uppercase',
     }}>
       {label}
@@ -140,7 +165,7 @@ const FlowNode = ({ label, sub, accent = C.primary, highlighted = false }) => (
       <div style={{
         fontFamily: FONT.body,
         fontSize: '11px',
-        color: C.dim,
+        color: C.muted,
         marginTop: '4px',
       }}>
         {sub}
@@ -149,47 +174,48 @@ const FlowNode = ({ label, sub, accent = C.primary, highlighted = false }) => (
   </div>
 )
 
-const Arrow = ({ color = C.primary }) => (
+// Arrow connector
+const Arrow = () => (
   <div style={{
-    color: `${color}60`,
-    fontSize: '14px',
-    padding: '0 6px',
+    color: C.border,
+    fontSize: '16px',
+    padding: '0 4px',
     display: 'flex',
     alignItems: 'center',
     fontFamily: FONT.mono,
-    letterSpacing: '-2px',
   }}>
-    ───▶
+    →
   </div>
 )
 
+// IBM Carbon — inline notification / issue row
 const IssueRow = ({ num, title, detail }) => (
   <div style={{
     display: 'flex',
     alignItems: 'flex-start',
     gap: '20px',
-    background: 'rgba(239,68,68,0.05)',
-    border: '1px solid rgba(239,68,68,0.15)',
-    borderLeft: '2px solid rgba(239,68,68,0.6)',
-    borderRadius: '3px',
-    padding: '18px 22px',
-    marginBottom: '12px',
+    background: 'rgba(250,77,86,0.06)',
+    border: '1px solid rgba(250,77,86,0.15)',
+    borderLeft: '3px solid rgba(250,77,86,0.7)',
+    padding: '16px 20px',
+    marginBottom: '10px',
   }}>
     <div style={{
-      fontFamily: FONT.display,
-      fontSize: '42px',
-      color: 'rgba(239,68,68,0.22)',
-      lineHeight: 1,
-      minWidth: '50px',
+      fontFamily: FONT.mono,
+      fontSize: '11px',
+      color: 'rgba(250,77,86,0.45)',
+      letterSpacing: '1px',
+      minWidth: '28px',
+      marginTop: '2px',
     }}>
       {num}
     </div>
     <div>
       <div style={{
         fontFamily: FONT.body,
-        fontSize: '18px',
-        fontWeight: 700,
-        color: C.white,
+        fontSize: '17px',
+        fontWeight: 600,
+        color: C.text,
         marginBottom: '3px',
       }}>
         {title}
@@ -205,63 +231,65 @@ const IssueRow = ({ num, title, detail }) => (
   </div>
 )
 
-const BulletRow = ({ children, color = C.primary }) => (
+// Bullet row
+const BulletRow = ({ children, color = C.blue }) => (
   <div style={{
     display: 'flex',
     alignItems: 'flex-start',
     gap: '12px',
-    marginBottom: '13px',
+    marginBottom: '12px',
   }}>
     <div style={{
       color,
       fontFamily: FONT.mono,
-      fontSize: '12px',
-      minWidth: '14px',
-      marginTop: '3px',
+      fontSize: '14px',
+      minWidth: '12px',
+      marginTop: '2px',
     }}>
-      ▸
+      ·
     </div>
     <div style={{
       fontFamily: FONT.body,
-      fontSize: '16px',
-      color: C.white,
-      lineHeight: 1.5,
+      fontSize: '15px',
+      color: C.text,
+      lineHeight: 1.55,
     }}>
       {children}
     </div>
   </div>
 )
 
+// IBM Carbon — tile / card for security layers
 const SecurityCard = ({ index, title, desc }) => (
   <div style={{
     flex: 1,
     background: C.card,
     border: `1px solid ${C.border}`,
-    borderTop: `2px solid ${C.primary}`,
-    borderRadius: '3px',
-    padding: '26px 22px',
+    borderTop: `2px solid ${C.blue}`,
+    padding: '24px 20px',
   }}>
     <div style={{
       fontFamily: FONT.mono,
       fontSize: '11px',
-      color: `${C.primary}70`,
-      letterSpacing: '2px',
-      marginBottom: '14px',
+      color: C.muted,
+      letterSpacing: '1px',
+      marginBottom: '12px',
     }}>
-      [{String(index).padStart(2, '0')}]
+      {String(index).padStart(2, '0')}
     </div>
     <div style={{
       fontFamily: FONT.display,
-      fontSize: '24px',
-      color: C.primary,
-      letterSpacing: '2px',
+      fontWeight: 700,
+      fontSize: '20px',
+      color: C.blue,
+      letterSpacing: '1px',
       marginBottom: '10px',
     }}>
       {title}
     </div>
     <div style={{
       fontFamily: FONT.body,
-      fontSize: '14px',
+      fontSize: '13px',
       color: C.dim,
       lineHeight: 1.65,
     }}>
@@ -270,24 +298,24 @@ const SecurityCard = ({ index, title, desc }) => (
   </div>
 )
 
+// IBM Carbon — pricing tile
 const PricingCard = ({ tier, model, price, highlight = false }) => (
   <div style={{
     flex: 1,
-    background: highlight ? `${C.primary}0E` : C.card,
-    border: `1px solid ${highlight ? C.primary : C.border}`,
-    borderTop: `2px solid ${highlight ? C.primary : 'transparent'}`,
-    borderRadius: '3px',
-    padding: '26px 22px',
+    background: highlight ? `rgba(15,98,254,0.08)` : C.card,
+    border: `1px solid ${highlight ? C.blue : C.border}`,
+    borderTop: `2px solid ${highlight ? C.blue : 'transparent'}`,
+    padding: '24px 20px',
     position: 'relative',
   }}>
     {highlight && (
       <div style={{
-        position: 'absolute', top: '-12px', left: '50%',
+        position: 'absolute', top: '-11px', left: '50%',
         transform: 'translateX(-50%)',
-        background: C.primary, color: C.dark,
+        background: C.blue, color: '#fff',
         fontFamily: FONT.mono, fontSize: '10px',
-        fontWeight: 700, letterSpacing: '2px',
-        padding: '3px 12px', borderRadius: '2px',
+        fontWeight: 500, letterSpacing: '1px',
+        padding: '2px 10px',
         whiteSpace: 'nowrap',
       }}>
         FOCO BRADESCO
@@ -295,20 +323,22 @@ const PricingCard = ({ tier, model, price, highlight = false }) => (
     )}
     <div style={{
       fontFamily: FONT.mono, fontSize: '10px',
-      color: highlight ? C.primary : C.dim,
-      letterSpacing: '2px', textTransform: 'uppercase',
+      color: highlight ? C.blue : C.muted,
+      letterSpacing: '1px', textTransform: 'uppercase',
       marginBottom: '10px',
     }}>
       {tier}
     </div>
     <div style={{
-      fontFamily: FONT.display, fontSize: '34px',
-      color: C.white, lineHeight: 1.1, marginBottom: '10px',
+      fontFamily: FONT.display,
+      fontWeight: 700,
+      fontSize: '28px',
+      color: C.text, lineHeight: 1.1, marginBottom: '10px',
     }}>
       {price}
     </div>
     <div style={{
-      fontFamily: FONT.body, fontSize: '14px',
+      fontFamily: FONT.body, fontSize: '13px',
       color: C.dim, lineHeight: 1.55,
     }}>
       {model}
@@ -316,36 +346,39 @@ const PricingCard = ({ tier, model, price, highlight = false }) => (
   </div>
 )
 
+// IBM Carbon — phase column
 const PhaseCol = ({ index, phase, items, color, done = false }) => (
   <div style={{
     flex: 1,
-    background: done ? `${color}0A` : C.card,
-    border: `1px solid ${color}30`,
+    background: done ? `rgba(15,98,254,0.06)` : C.card,
+    border: `1px solid ${color}28`,
     borderTop: `2px solid ${color}`,
-    padding: '24px 22px',
+    padding: '22px 20px',
   }}>
-    <div style={{ marginBottom: '18px' }}>
+    <div style={{ marginBottom: '16px' }}>
       <div style={{
         fontFamily: FONT.mono, fontSize: '10px',
-        color: `${color}70`, letterSpacing: '2px',
+        color: C.muted, letterSpacing: '1px',
         marginBottom: '4px',
       }}>
-        [{String(index).padStart(2, '0')}] {done ? '— CONCLUÍDO' : '— PLANEJADO'}
+        {String(index).padStart(2, '0')} {done ? '— CONCLUÍDO' : '— PLANEJADO'}
       </div>
       <div style={{
-        fontFamily: FONT.display, fontSize: '26px',
-        color, letterSpacing: '3px',
+        fontFamily: FONT.display,
+        fontWeight: 700,
+        fontSize: '22px',
+        color, letterSpacing: '1px',
       }}>
         {phase}
       </div>
     </div>
     {items.map((item, i) => (
       <div key={i} style={{
-        fontFamily: FONT.body, fontSize: '14px',
-        color: done ? C.dim : 'rgba(240,237,232,0.72)',
-        marginBottom: '9px',
-        paddingLeft: '12px',
-        borderLeft: `1px solid ${color}30`,
+        fontFamily: FONT.body, fontSize: '13px',
+        color: C.dim,
+        marginBottom: '8px',
+        paddingLeft: '10px',
+        borderLeft: `1px solid ${color}28`,
         lineHeight: 1.45,
       }}>
         {item}
@@ -354,7 +387,7 @@ const PhaseCol = ({ index, phase, items, color, done = false }) => (
   </div>
 )
 
-// ─── Deck template ────────────────────────────────────────────────────────────
+// ─── Footer template ────────────────────────────────────────────────────────────
 const Template = ({ slideNumber, numberOfSlides }) => (
   <FlexBox
     justifyContent="space-between"
@@ -362,75 +395,69 @@ const Template = ({ slideNumber, numberOfSlides }) => (
     position="absolute"
     bottom={0}
     width={1}
-    style={{ padding: '0 48px 18px' }}
+    style={{ padding: '0 48px 16px' }}
   >
     <div style={{
       fontFamily: FONT.mono, fontSize: '10px',
-      color: 'rgba(240,237,232,0.18)', letterSpacing: '3px',
+      color: 'rgba(244,244,244,0.18)', letterSpacing: '2px',
     }}>
       HARVESTSHIELD
     </div>
     <div style={{
       fontFamily: FONT.mono, fontSize: '10px',
-      color: 'rgba(240,237,232,0.18)',
+      color: 'rgba(244,244,244,0.18)',
     }}>
       {slideNumber} / {numberOfSlides}
     </div>
   </FlexBox>
 )
 
-// ─── Geometric decoration ─────────────────────────────────────────────────────
-const HexDecor = () => (
-  <svg width="200" height="200" viewBox="0 0 200 200" fill="none">
-    <polygon points="100,8 190,55 190,145 100,192 10,145 10,55"
-      stroke={C.primary} strokeWidth="1" opacity="0.3" />
-    <polygon points="100,28 170,70 170,130 100,172 30,130 30,70"
-      stroke={C.primary} strokeWidth="0.8" opacity="0.16" />
-    <polygon points="100,48 150,85 150,115 100,152 50,115 50,85"
-      stroke={C.primary} strokeWidth="0.6" opacity="0.1" />
-    <circle cx="100" cy="100" r="3.5" fill={C.primary} opacity="0.7" />
-    {[0, 60, 120, 180, 240, 300].map((deg, i) => {
-      const r = Math.PI / 180
-      return (
-        <circle key={i}
-          cx={100 + 82 * Math.cos(deg * r)}
-          cy={100 + 82 * Math.sin(deg * r)}
-          r="2.5" fill={C.primary} opacity="0.4"
-        />
-      )
-    })}
-    {[0, 60, 120, 180, 240, 300].map((deg, i) => {
-      const r = Math.PI / 180
-      return <line key={i} x1="100" y1="100"
-        x2={100 + 82 * Math.cos(deg * r)}
-        y2={100 + 82 * Math.sin(deg * r)}
-        stroke={C.primary} strokeWidth="0.4" opacity="0.18" />
-    })}
-  </svg>
+// ─── IBM Carbon — logo mark (3D cube) ──────────────────────────────────────────
+const IBMCubeMark = () => (
+  <div style={{
+    width: '24px', height: '24px',
+    background: C.blue,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  }}>
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <path d="M8 1L1 4.5v7L8 15l7-3.5v-7L8 1zm0 1.5l5.5 2.75L8 8 2.5 5.25 8 2.5zM2 6.35l5.5 2.75v5.5L2 11.85V6.35zm7 8.25v-5.5l5.5-2.75v5.5L9 14.6z" fill="white"/>
+    </svg>
+  </div>
 )
 
-// ─── Presentation ─────────────────────────────────────────────────────────────
+// ─── Presentation ───────────────────────────────────────────────────────────────
 export default function Presentation() {
   return (
     <Deck theme={theme} template={Template}>
 
-      {/* ── COVER ───────────────────────────────────────────────────────────── */}
+      {/* ── COVER ─────────────────────────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.darker}
+        backgroundColor={C.bg}
         backgroundImage={BG.dots}
-        backgroundSize="40px 40px"
+        backgroundSize="32px 32px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" alignItems="center" style={{ padding: '0 80px' }}>
           <div style={{ flex: 1 }}>
-            <Tag>inovaBra Bradesco — 2026</Tag>
-            <div style={{ marginTop: '28px' }}>
+            {/* IBM Carbon product header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
+              <IBMCubeMark />
+              <div style={{
+                fontFamily: FONT.body, fontSize: '13px',
+                color: C.dim, fontWeight: 400,
+              }}>
+                HarvestShield · inovaBra Bradesco 2026
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '8px' }}>
               <div style={{
                 fontFamily: FONT.display,
-                fontSize: '112px',
-                color: C.white,
-                lineHeight: 0.88,
-                letterSpacing: '5px',
+                fontWeight: 700,
+                fontSize: '96px',
+                color: C.text,
+                lineHeight: 0.9,
+                letterSpacing: '-1px',
               }}>
                 HARVEST
               </div>
@@ -438,34 +465,79 @@ export default function Presentation() {
                 className="shimmer-text"
                 style={{
                   fontFamily: FONT.display,
-                  fontSize: '112px',
-                  lineHeight: 0.88,
-                  letterSpacing: '5px',
+                  fontWeight: 700,
+                  fontSize: '96px',
+                  lineHeight: 0.9,
+                  letterSpacing: '-1px',
+                  display: 'block',
                 }}
               >
                 SHIELD
               </div>
             </div>
-            <Bar width="64px" />
+
+            <Rule width="48px" />
+
             <div style={{
               fontFamily: FONT.body,
-              fontSize: '19px',
+              fontSize: '18px',
               color: C.dim,
               lineHeight: 1.7,
-              maxWidth: '460px',
+              maxWidth: '480px',
+              marginBottom: '32px',
             }}>
               Monitoramento agrícola com dados{' '}
-              <span style={{ color: C.white, fontWeight: 600 }}>verificados e imutáveis</span>{' '}
+              <span style={{ color: C.text, fontWeight: 600 }}>verificados e imutáveis</span>{' '}
               em blockchain — para crédito rural e seguros sem fraude.
             </div>
-            <div style={{ marginTop: '32px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {['IoT — ESP32', 'Blockchain Stellar', 'Seguros Agrícolas'].map(t => (
                 <Tag key={t}>{t}</Tag>
               ))}
             </div>
           </div>
-          <div style={{ padding: '0 0 0 40px', opacity: 0.7 }}>
-            <HexDecor />
+
+          {/* Right column — IBM Carbon-style data panel */}
+          <div style={{
+            width: '260px',
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderTop: `2px solid ${C.blue}`,
+            padding: '24px',
+            flexShrink: 0,
+          }}>
+            {[
+              { k: 'Formato', v: 'Pitch ao vivo' },
+              { k: 'Duração', v: '5–10 minutos' },
+              { k: 'Objetivo', v: 'Parceria + Seed' },
+              { k: 'Stack', v: 'ESP32 + Stellar' },
+              { k: 'Status', v: 'MVP ativo', green: true },
+            ].map(({ k, v, green }) => (
+              <div key={k} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                marginBottom: '12px',
+                paddingBottom: '12px',
+                borderBottom: `1px solid ${C.border}`,
+              }}>
+                <span style={{
+                  fontFamily: FONT.mono, fontSize: '10px',
+                  color: C.muted, letterSpacing: '1px',
+                }}>
+                  {k}
+                </span>
+                <span style={{
+                  fontFamily: FONT.body, fontSize: '13px',
+                  color: green ? C.green : C.text,
+                  fontWeight: green ? 600 : 400,
+                  textAlign: 'right',
+                }}>
+                  {v}
+                </span>
+              </div>
+            ))}
           </div>
         </FlexBox>
         <Notes>
@@ -473,25 +545,27 @@ export default function Presentation() {
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 1: PROBLEMA ───────────────────────────────────────────────── */}
+      {/* ── SLIDE 1: PROBLEMA ─────────────────────────────────────────────────── */}
       <Slide
-        backgroundColor="#09050A"
+        backgroundColor={C.bg}
         backgroundImage={BG.grid}
-        backgroundSize="60px 60px"
+        backgroundSize="48px 48px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
           <Label color={C.red}>O problema do banco</Label>
-          <div>
+
+          <div style={{ marginBottom: '8px' }}>
             <div style={{
-              fontFamily: FONT.mono, fontSize: '16px',
-              color: C.dim, letterSpacing: '4px',
+              fontFamily: FONT.mono, fontSize: '14px',
+              color: C.muted, letterSpacing: '3px', marginBottom: '4px',
             }}>
               R$
             </div>
             <div style={{
               fontFamily: FONT.display,
-              fontSize: '148px',
+              fontWeight: 700,
+              fontSize: '132px',
               color: C.red,
               lineHeight: 0.85,
               letterSpacing: '-2px',
@@ -500,27 +574,37 @@ export default function Presentation() {
             </div>
             <div style={{
               fontFamily: FONT.body,
-              fontSize: '21px',
+              fontSize: '20px',
               color: C.dim,
-              marginTop: '10px',
+              marginTop: '12px',
+              fontWeight: 300,
             }}>
               pagos em sinistros agrícolas em 2023
             </div>
           </div>
-          <Bar color={C.red} width="48px" />
+
+          <Rule color={C.red} width="40px" />
+
           <Appear>
             <div style={{
-              fontFamily: FONT.body,
-              fontSize: '24px',
-              color: C.white,
-              lineHeight: 1.55,
-              maxWidth: '660px',
-              fontStyle: 'italic',
+              background: 'rgba(250,77,86,0.06)',
+              border: '1px solid rgba(250,77,86,0.2)',
+              borderLeft: '3px solid rgba(250,77,86,0.7)',
+              padding: '16px 20px',
+              maxWidth: '640px',
             }}>
-              "Quantos foram baseados em dados que{' '}
-              <span style={{ color: C.red, fontStyle: 'normal', fontWeight: 700 }}>
-                poderiam ter sido manipulados?
-              </span>"
+              <div style={{
+                fontFamily: FONT.body,
+                fontSize: '20px',
+                color: C.text,
+                lineHeight: 1.55,
+                fontStyle: 'italic',
+              }}>
+                "Quantos foram baseados em dados que poderiam ter sido{' '}
+                <span style={{ color: C.red, fontStyle: 'normal', fontWeight: 600 }}>
+                  manipulados?
+                </span>"
+              </div>
             </div>
           </Appear>
         </FlexBox>
@@ -529,28 +613,36 @@ export default function Presentation() {
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 2: MERCADO ────────────────────────────────────────────────── */}
+      {/* ── SLIDE 2: MERCADO ──────────────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.dark}
+        backgroundColor={C.bg}
         backgroundImage={BG.dots}
-        backgroundSize="40px 40px"
+        backgroundSize="32px 32px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
           <Label>Dimensão do mercado</Label>
-          <Heading fontSize="h2" style={{ letterSpacing: '3px', marginBottom: '44px' }}>
+          <div style={{
+            fontFamily: FONT.display,
+            fontWeight: 700,
+            fontSize: '44px',
+            color: C.text,
+            letterSpacing: '-0.5px',
+            marginBottom: '36px',
+            lineHeight: 1.15,
+          }}>
             O agro cresce.{' '}
-            <span style={{ color: C.primary }}>O dado não acompanha.</span>
-          </Heading>
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'stretch' }}>
+            <span style={{ color: C.blue }}>O dado não acompanha.</span>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch' }}>
             <Appear>
-              <StatCard value="27%" label="do PIB brasileiro é agronegócio" accent={C.primary} />
+              <StatCard value="27%" label="do PIB brasileiro é agronegócio" accent={C.blue} />
             </Appear>
             <Appear>
-              <StatCard value="+180%" label="crescimento do seguro rural em 5 anos" accent={C.accent} />
+              <StatCard value="+180%" label="crescimento do seguro rural nos últimos 5 anos" accent={C.blueLt} />
             </Appear>
             <Appear>
-              <StatCard value="900 km²" label="cobertos por apenas 1 estação meteorológica" accent={C.white} />
+              <StatCard value="900 km²" label="cobertos por apenas 1 estação meteorológica" accent={C.muted} />
             </Appear>
           </div>
         </FlexBox>
@@ -559,18 +651,25 @@ export default function Presentation() {
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 3: FRAUDE HOJE ────────────────────────────────────────────── */}
+      {/* ── SLIDE 3: FRAUDE HOJE ──────────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.dark}
+        backgroundColor={C.bg}
         backgroundImage={BG.grid}
-        backgroundSize="60px 60px"
+        backgroundSize="48px 48px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
           <Label color={C.red}>Fragilidade do processo atual</Label>
-          <Heading fontSize="h2" style={{ letterSpacing: '3px', marginBottom: '36px' }}>
+          <div style={{
+            fontFamily: FONT.display,
+            fontWeight: 700,
+            fontSize: '44px',
+            color: C.text,
+            letterSpacing: '-0.5px',
+            marginBottom: '28px',
+          }}>
             Três falhas estruturais
-          </Heading>
+          </div>
           <Appear>
             <IssueRow num="01"
               title="Dados coletados após o evento"
@@ -592,60 +691,66 @@ export default function Presentation() {
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 4: SOLUÇÃO ────────────────────────────────────────────────── */}
+      {/* ── SLIDE 4: SOLUÇÃO ──────────────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.dark}
+        backgroundColor={C.bg}
         backgroundImage={BG.dots}
-        backgroundSize="40px 40px"
+        backgroundSize="32px 32px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
           <Label>Nossa solução</Label>
-          <Heading fontSize="h2" style={{ letterSpacing: '3px', marginBottom: '10px' }}>
-            Dado coletado.{' '}
-            <span style={{ color: C.primary }}>Assinado. Imutável.</span>
-          </Heading>
           <div style={{
-            fontFamily: FONT.body, fontSize: '17px', color: C.dim,
-            marginBottom: '40px',
+            fontFamily: FONT.display,
+            fontWeight: 700,
+            fontSize: '44px',
+            color: C.text,
+            letterSpacing: '-0.5px',
+            marginBottom: '6px',
+          }}>
+            Dado coletado.{' '}
+            <span style={{ color: C.blue }}>Assinado. Imutável.</span>
+          </div>
+          <div style={{
+            fontFamily: FONT.body, fontSize: '16px', color: C.dim,
+            marginBottom: '32px',
           }}>
             Verificável por qualquer auditor, em qualquer momento, sem intermediários.
           </div>
 
+          {/* IBM Carbon — process flow */}
           <div style={{
             display: 'flex', alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(0,0,0,0.28)',
+            background: C.surface,
             border: `1px solid ${C.border}`,
-            borderRadius: '4px',
-            padding: '26px 32px',
+            padding: '20px 24px',
             gap: 0,
+            marginBottom: '16px',
           }}>
-            <FlowNode label="ESP32" sub="Sensor IoT" accent={C.accent} />
-            <Arrow color={C.accent} />
-            <FlowNode label="ORACLE" sub="ECDSA + PoW" accent={C.primary} highlighted />
+            <FlowNode label="ESP32" sub="Sensor IoT" />
             <Arrow />
-            <FlowNode label="DATABASE" sub="PostgreSQL" accent={C.primary} />
+            <FlowNode label="ORACLE" sub="ECDSA + PoW" highlighted />
             <Arrow />
-            <FlowNode label="STELLAR" sub="Blockchain" accent={C.accent} />
+            <FlowNode label="DATABASE" sub="PostgreSQL" />
+            <Arrow />
+            <FlowNode label="STELLAR" sub="Blockchain" />
             <Arrow />
             <div style={{
-              background: `${C.primary}14`,
-              border: `1.5px solid ${C.primary}`,
-              borderRadius: '3px',
-              padding: '18px 14px',
+              background: `rgba(15,98,254,0.12)`,
+              border: `1.5px solid ${C.blue}`,
+              padding: '16px 14px',
               textAlign: 'center',
-              minWidth: '118px',
+              minWidth: '110px',
             }}>
               <div style={{
                 fontFamily: FONT.mono, fontSize: '11px',
-                color: C.primary, fontWeight: 700, letterSpacing: '1px',
+                color: C.blue, fontWeight: 500, letterSpacing: '1px',
               }}>
                 BRADESCO
               </div>
               <div style={{
                 fontFamily: FONT.body, fontSize: '11px',
-                color: C.dim, marginTop: '4px',
+                color: C.muted, marginTop: '4px',
               }}>
                 API verificada
               </div>
@@ -654,15 +759,13 @@ export default function Presentation() {
 
           <Appear>
             <div style={{
-              marginTop: '18px',
-              background: `${C.primary}08`,
-              border: `1px solid ${C.primary}22`,
-              borderRadius: '3px',
-              padding: '13px 20px',
+              background: `rgba(15,98,254,0.06)`,
+              border: `1px solid rgba(15,98,254,0.18)`,
+              padding: '12px 18px',
             }}>
               <div style={{
-                fontFamily: FONT.body, fontSize: '15px',
-                color: `${C.primary}CC`, fontStyle: 'italic',
+                fontFamily: FONT.body, fontSize: '14px',
+                color: C.blueLt, fontStyle: 'italic',
               }}>
                 Nenhum dado pode ser alterado retroativamente — nem pelo produtor, nem pelo operador, nem por nós.
               </div>
@@ -674,64 +777,61 @@ export default function Presentation() {
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 5: DEMO ───────────────────────────────────────────────────── */}
+      {/* ── SLIDE 5: DEMO ─────────────────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.darker}
+        backgroundColor={C.bg}
         backgroundImage={BG.grid}
-        backgroundSize="60px 60px"
+        backgroundSize="48px 48px"
         backgroundRepeat="repeat"
       >
-        {/* Full-slide absolute layout so iframe fills the space */}
         <div style={{
           position: 'absolute',
           inset: 0,
           display: 'flex',
           flexDirection: 'column',
-          padding: '14px 20px 28px',
+          padding: '12px 16px 24px',
         }}>
-          {/* Header bar */}
+          {/* IBM Carbon — topbar style demo header */}
           <div style={{
             display: 'flex', alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: '10px',
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderBottom: 'none',
+            padding: '8px 16px',
             flexShrink: 0,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span className="live-dot" />
               <span style={{
                 fontFamily: FONT.mono, fontSize: '11px',
-                color: C.red, letterSpacing: '4px', textTransform: 'uppercase',
+                color: C.red, letterSpacing: '2px', textTransform: 'uppercase',
               }}>
                 Demonstração ao vivo
               </span>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <a
-                href={DASHBOARD_URL}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  background: `${C.primary}18`,
-                  border: `1px solid ${C.primary}55`,
-                  borderRadius: '2px',
-                  padding: '4px 12px',
-                  fontFamily: FONT.mono,
-                  fontSize: '10px',
-                  color: C.primary,
-                  letterSpacing: '1px',
-                  textDecoration: 'none',
-                }}
-              >
-                ABRIR ↗
-              </a>
-            </div>
+            <a
+              href={DASHBOARD_URL}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                background: C.blue,
+                color: '#fff',
+                padding: '4px 14px',
+                fontFamily: FONT.mono,
+                fontSize: '10px',
+                letterSpacing: '1px',
+                textDecoration: 'none',
+                fontWeight: 500,
+              }}
+            >
+              ABRIR ↗
+            </a>
           </div>
 
-          {/* iframe — fills remaining height */}
           <div style={{
             flex: 1,
-            border: `1px solid ${C.primary}28`,
-            borderRadius: '4px',
+            border: `1px solid ${C.border}`,
             overflow: 'hidden',
             position: 'relative',
             minHeight: 0,
@@ -739,46 +839,42 @@ export default function Presentation() {
             <iframe
               src={DASHBOARD_URL}
               title="HarvestShield Dashboard"
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                display: 'block',
-              }}
+              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
             />
           </div>
 
-          {/* Footer note */}
           <div style={{
-            fontFamily: FONT.body, fontSize: '12px',
-            color: C.dim, marginTop: '8px',
-            textAlign: 'center', fontStyle: 'italic',
+            fontFamily: FONT.mono, fontSize: '11px',
+            color: C.muted, marginTop: '8px',
+            textAlign: 'center',
             flexShrink: 0,
           }}>
-            Clicar em "confirmed" → Stellar Explorer — transação pública e permanente
+            Clicar em "Stellar OK" → Stellar Explorer — transação pública e permanente
           </div>
         </div>
         <Notes>
-          O dashboard aparece diretamente neste slide.
-          Percurso: DeviceCard — ReadingCard — clicar em TX confirmed — Stellar Explorer.
+          Percurso: KPIs → ReadingFeed → clicar em TX confirmed → Stellar Explorer.
           Botão "ABRIR ↗" abre em nova aba para tela cheia.
-          Para usar URL de produção: editar DASHBOARD_URL no topo de Presentation.jsx.
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 6: SEGURANÇA ──────────────────────────────────────────────── */}
+      {/* ── SLIDE 6: SEGURANÇA ────────────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.dark}
+        backgroundColor={C.bg}
         backgroundImage={BG.dots}
-        backgroundSize="40px 40px"
+        backgroundSize="32px 32px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
           <Label>Arquitetura de segurança</Label>
-          <Heading fontSize="h2" style={{ letterSpacing: '3px', marginBottom: '40px' }}>
+          <div style={{
+            fontFamily: FONT.display, fontWeight: 700,
+            fontSize: '44px', color: C.text,
+            letterSpacing: '-0.5px', marginBottom: '32px',
+          }}>
             Três camadas independentes
-          </Heading>
-          <div style={{ display: 'flex', gap: '18px', alignItems: 'stretch' }}>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch' }}>
             <Appear>
               <SecurityCard index={1}
                 title="ECDSA P-256"
@@ -800,16 +896,15 @@ export default function Presentation() {
           </div>
           <Appear>
             <div style={{
-              marginTop: '20px',
-              background: `${C.primary}08`,
-              border: `1px solid ${C.primary}20`,
-              borderRadius: '3px',
-              padding: '13px 22px',
+              marginTop: '18px',
+              background: `rgba(15,98,254,0.06)`,
+              border: `1px solid rgba(15,98,254,0.18)`,
+              padding: '12px 20px',
               textAlign: 'center',
             }}>
               <div style={{
-                fontFamily: FONT.body, fontSize: '15px',
-                color: `${C.primary}BB`, fontStyle: 'italic',
+                fontFamily: FONT.body, fontSize: '14px',
+                color: C.blueLt, fontStyle: 'italic',
               }}>
                 "O nível de garantia que um contrato de seguro ou uma operação de crédito rural exigem."
               </div>
@@ -821,19 +916,23 @@ export default function Presentation() {
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 7: MODELO DE NEGÓCIO ──────────────────────────────────────── */}
+      {/* ── SLIDE 7: MODELO DE NEGÓCIO ────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.dark}
+        backgroundColor={C.bg}
         backgroundImage={BG.grid}
-        backgroundSize="60px 60px"
+        backgroundSize="48px 48px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
           <Label>Modelo de negócio</Label>
-          <Heading fontSize="h2" style={{ letterSpacing: '3px', marginBottom: '40px' }}>
+          <div style={{
+            fontFamily: FONT.display, fontWeight: 700,
+            fontSize: '44px', color: C.text,
+            letterSpacing: '-0.5px', marginBottom: '32px',
+          }}>
             Três fontes de receita
-          </Heading>
-          <div style={{ display: 'flex', gap: '18px', alignItems: 'stretch' }}>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch' }}>
             <PricingCard
               tier="Produtor Rural"
               model="SaaS por dispositivo instalado na propriedade"
@@ -853,8 +952,8 @@ export default function Presentation() {
           </div>
           <Appear>
             <div style={{
-              marginTop: '20px',
-              fontFamily: FONT.body, fontSize: '15px',
+              marginTop: '18px',
+              fontFamily: FONT.body, fontSize: '14px',
               color: C.dim, textAlign: 'center', fontStyle: 'italic',
             }}>
               Para o Bradesco: dados verificados integráveis diretamente aos sistemas de crédito rural e Bradesco Seguros.
@@ -867,21 +966,25 @@ export default function Presentation() {
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 8: PHASE 2 ────────────────────────────────────────────────── */}
+      {/* ── SLIDE 8: PHASE 2 ──────────────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.dark}
+        backgroundColor={C.bg}
         backgroundImage={BG.dots}
-        backgroundSize="40px 40px"
+        backgroundSize="32px 32px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
-          <Label color={C.primary}>Plano de expansão</Label>
-          <Heading fontSize="h2" style={{ letterSpacing: '3px', marginBottom: '40px' }}>
+          <Label>Plano de expansão</Label>
+          <div style={{
+            fontFamily: FONT.display, fontWeight: 700,
+            fontSize: '44px', color: C.text,
+            letterSpacing: '-0.5px', marginBottom: '32px',
+          }}>
             Software validado.{' '}
-            <span style={{ color: C.primary }}>Hardware a seguir.</span>
-          </Heading>
-          <div style={{ display: 'flex', alignItems: 'stretch' }}>
-            <PhaseCol index={1} phase="HOJE" color={C.primary} done
+            <span style={{ color: C.blue }}>Hardware a seguir.</span>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
+            <PhaseCol index={1} phase="HOJE" color={C.blue} done
               items={[
                 'Firmware C++ completo e testado',
                 'Backend em produção — Supabase',
@@ -889,7 +992,7 @@ export default function Presentation() {
                 'Autenticação ECDSA + Proof of Work ativa',
               ]}
             />
-            <PhaseCol index={2} phase="6 MESES" color={C.accent}
+            <PhaseCol index={2} phase="6 MESES" color={C.blueLt}
               items={[
                 'Sensores físicos instalados em campo',
                 'Comunicação LoRaWAN para áreas rurais sem cobertura',
@@ -897,7 +1000,7 @@ export default function Presentation() {
                 '50 dispositivos ativos em fazendas piloto',
               ]}
             />
-            <PhaseCol index={3} phase="12 MESES" color={C.white}
+            <PhaseCol index={3} phase="12 MESES" color={C.muted}
               items={[
                 '500+ dispositivos em operação',
                 'API de sinistros integrada a seguradoras',
@@ -913,36 +1016,41 @@ export default function Presentation() {
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 9: O QUE PEDIMOS ──────────────────────────────────────────── */}
+      {/* ── SLIDE 9: O QUE PEDIMOS ────────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.dark}
+        backgroundColor={C.bg}
         backgroundImage={BG.grid}
-        backgroundSize="60px 60px"
+        backgroundSize="48px 48px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
           <Label>Proposta ao Bradesco</Label>
-          <Heading fontSize="h2" style={{ letterSpacing: '3px', marginBottom: '40px' }}>
+          <div style={{
+            fontFamily: FONT.display, fontWeight: 700,
+            fontSize: '44px', color: C.text,
+            letterSpacing: '-0.5px', marginBottom: '32px',
+          }}>
             Duas coisas. Claras.
-          </Heading>
-          <div style={{ display: 'flex', gap: '28px', alignItems: 'stretch' }}>
+          </div>
+          <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch' }}>
+            {/* Parceria */}
             <div style={{
               flex: 1,
-              background: `${C.primary}08`,
-              border: `1px solid ${C.primary}28`,
-              borderTop: `2px solid ${C.primary}`,
-              borderRadius: '3px',
-              padding: '28px 26px',
+              background: `rgba(15,98,254,0.06)`,
+              border: `1px solid rgba(15,98,254,0.2)`,
+              borderTop: `2px solid ${C.blue}`,
+              padding: '24px 22px',
             }}>
               <div style={{
-                fontFamily: FONT.display, fontSize: '28px',
-                color: C.primary, letterSpacing: '3px', marginBottom: '6px',
+                fontFamily: FONT.display, fontWeight: 700,
+                fontSize: '24px', color: C.blue,
+                letterSpacing: '0.5px', marginBottom: '4px',
               }}>
                 Parceria estratégica
               </div>
               <div style={{
-                fontFamily: FONT.body, fontSize: '13px',
-                color: C.dim, fontStyle: 'italic', marginBottom: '20px',
+                fontFamily: FONT.mono, fontSize: '11px',
+                color: C.muted, marginBottom: '18px',
               }}>
                 Co-desenvolvimento do caso de uso
               </div>
@@ -957,34 +1065,35 @@ export default function Presentation() {
               </Appear>
             </div>
 
+            {/* Investimento */}
             <div style={{
               flex: 1,
-              background: `${C.accent}06`,
-              border: `1px solid ${C.accent}22`,
-              borderTop: `2px solid ${C.accent}`,
-              borderRadius: '3px',
-              padding: '28px 26px',
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderTop: `2px solid ${C.blueLt}`,
+              padding: '24px 22px',
             }}>
               <div style={{
-                fontFamily: FONT.display, fontSize: '28px',
-                color: C.accent, letterSpacing: '3px', marginBottom: '6px',
+                fontFamily: FONT.display, fontWeight: 700,
+                fontSize: '24px', color: C.blueLt,
+                letterSpacing: '0.5px', marginBottom: '4px',
               }}>
                 Investimento seed
               </div>
               <div style={{
-                fontFamily: FONT.body, fontSize: '13px',
-                color: C.dim, fontStyle: 'italic', marginBottom: '20px',
+                fontFamily: FONT.mono, fontSize: '11px',
+                color: C.muted, marginBottom: '18px',
               }}>
                 Hardware físico — Phase 2
               </div>
               <Appear>
-                <BulletRow color={C.accent}>Capital para produção do hardware do Phase 2</BulletRow>
+                <BulletRow color={C.blueLt}>Capital para produção do hardware do Phase 2</BulletRow>
               </Appear>
               <Appear>
-                <BulletRow color={C.accent}>Meta: 50 dispositivos físicos instalados em 6 meses</BulletRow>
+                <BulletRow color={C.blueLt}>Meta: 50 dispositivos físicos instalados em 6 meses</BulletRow>
               </Appear>
               <Appear>
-                <BulletRow color={C.accent}>Retorno: Bradesco como primeiro cliente da API de verificação</BulletRow>
+                <BulletRow color={C.blueLt}>Retorno: Bradesco como primeiro cliente da API de verificação</BulletRow>
               </Appear>
             </div>
           </div>
@@ -995,11 +1104,11 @@ export default function Presentation() {
         </Notes>
       </Slide>
 
-      {/* ── SLIDE 10: CTA ───────────────────────────────────────────────────── */}
+      {/* ── SLIDE 10: CTA ─────────────────────────────────────────────────────── */}
       <Slide
-        backgroundColor={C.darker}
+        backgroundColor={C.bg}
         backgroundImage={BG.dots}
-        backgroundSize="40px 40px"
+        backgroundSize="32px 32px"
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" alignItems="center">
@@ -1007,40 +1116,41 @@ export default function Presentation() {
 
           <div style={{
             fontFamily: FONT.display,
-            fontSize: '96px',
-            color: C.white,
-            letterSpacing: '4px',
-            lineHeight: 0.88,
+            fontWeight: 700,
+            fontSize: '88px',
+            color: C.text,
+            letterSpacing: '-1px',
+            lineHeight: 0.9,
             textAlign: 'center',
-            marginBottom: '36px',
+            marginBottom: '32px',
           }}>
             90 DIAS.<br />
-            <span style={{ color: C.primary }}>3 FAZENDAS.</span><br />
+            <span style={{ color: C.blue }}>3 FAZENDAS.</span><br />
             <span className="shimmer-text">BLOCKCHAIN REAL.</span>
           </div>
 
-          <Bar color={C.primary} width="64px" />
+          <Rule color={C.blue} width="48px" />
 
           <div style={{
-            fontFamily: FONT.body, fontSize: '19px',
+            fontFamily: FONT.body, fontSize: '18px',
             color: C.dim, textAlign: 'center',
-            maxWidth: '560px', lineHeight: 1.7,
+            maxWidth: '520px', lineHeight: 1.7,
             marginBottom: '36px',
           }}>
             Não pedimos para apostar em uma ideia.<br />
             O sistema{' '}
-            <span style={{ color: C.white, fontWeight: 700 }}>funciona</span>
+            <span style={{ color: C.text, fontWeight: 600 }}>funciona</span>
             {' '}— vocês acabaram de ver.
           </div>
 
           <div style={{
-            background: C.primary,
-            color: C.dark,
-            padding: '14px 44px',
-            borderRadius: '3px',
+            background: C.blue,
+            color: '#fff',
+            padding: '14px 48px',
             fontFamily: FONT.display,
-            fontSize: '26px',
-            letterSpacing: '5px',
+            fontWeight: 700,
+            fontSize: '22px',
+            letterSpacing: '3px',
           }}>
             VAMOS COMEÇAR?
           </div>
