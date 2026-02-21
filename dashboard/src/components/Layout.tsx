@@ -2,10 +2,10 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { ConnectionStatus } from './ConnectionStatus'
 
 const TABS = [
-  { to: '/',            label: 'Visão Geral', icon: '🌿', end: true },
-  { to: '/analytics',  label: 'Analytics',   icon: '📊' },
-  { to: '/devices',    label: 'Dispositivos', icon: '🛰️' },
-  { to: '/blockchain', label: 'Blockchain',   icon: '⛓️' },
+  { to: '/',            label: 'Visão Geral',  end: true },
+  { to: '/analytics',  label: 'Analytics' },
+  { to: '/devices',    label: 'Dispositivos' },
+  { to: '/blockchain', label: 'Blockchain' },
 ]
 
 export function Layout() {
@@ -13,19 +13,13 @@ export function Layout() {
     <div className="layout">
       <header className="topbar">
         <div className="topbar__main">
-          <div className="topbar__brand">
-            <div className="topbar__logo">🌱</div>
-            <span className="topbar__name">
-              Harvest<span>Shield</span>
-            </span>
-          </div>
+          <a href="/" className="topbar__brand">
+            HARVEST<em>SHIELD</em>
+          </a>
           <div className="topbar__spacer" />
           <div className="topbar__right">
             <ConnectionStatus />
-            <div className="topbar__farm">
-              <span>📍</span>
-              Fazenda Norte
-            </div>
+            <span className="topbar__farm">Fazenda Norte</span>
           </div>
         </div>
 
@@ -39,7 +33,6 @@ export function Layout() {
                 `topbar__tab${isActive ? ' topbar__tab--active' : ''}`
               }
             >
-              <span className="topbar__tab-icon">{tab.icon}</span>
               {tab.label}
             </NavLink>
           ))}

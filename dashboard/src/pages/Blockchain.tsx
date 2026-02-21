@@ -4,41 +4,26 @@ import { StellarExplorer } from '../components/StellarExplorer'
 import { useRelativeTime } from '../hooks/useRelativeTime'
 import type { Reading } from '../types/reading'
 
-function TxRow({ reading, onHashClick }: { reading: Reading; onHashClick: (h: string) => void }) {
-  const rel = useRelativeTime(reading.created_at)
+function TxRow({ r, onHash }: { r: Reading; onHash: (h: string) => void }) {
+  const rel = useRelativeTime(r.created_at)
 
-  const statusClass = {
-    confirmed: 'tx-badge--confirmed',
-    pending:   'tx-badge--pending',
-    failed:    'tx-badge--failed',
-  }[reading.blockchain_status]
-
-  const statusLabel = {
-    confirmed: '✓ Confirmado',
-    pending:   '⏳ Pendente',
-    failed:    '✗ Falhou',
-  }[reading.blockchain_status]
+  const cls = { confirmed: 'tx-badge--confirmed', pending: 'tx-badge--pending', failed: 'tx-badge--failed' }[r.blockchain_status]
+  const lbl = { confirmed: 'OK', pending: 'AGUARDA', failed: 'FALHOU' }[r.blockchain_status]
 
   return (
     <tr>
-      <td><span className="bk-table__device">{reading.device_id}</span></td>
-      <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>{rel}</td>
+      <td><span className="bk-table__dev">{r.device_id}</span></td>
+      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.625rem', color: 'var(--ink-3)' }}>{rel}</td>
       <td>
-        {reading.blockchain_tx_hash ? (
-          <button
-            className="bk-table__hash"
-            onClick={() => onHashClick(reading.blockchain_tx_hash!)}
-            title={reading.blockchain_tx_hash}
-          >
-            {reading.blockchain_tx_hash.slice(0, 8)}…{reading.blockchain_tx_hash.slice(-8)}
+        {r.blockchain_tx_hash ? (
+          <button className="bk-table__hash" onClick={() => onHash(r.blockchain_tx_hash!)} title={r.blockchain_tx_hash}>
+            {r.blockchain_tx_hash.slice(0, 8)}…{r.blockchain_tx_hash.slice(-8)}
           </button>
         ) : (
-          <span style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>—</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.625rem', color: 'var(--ink-3)' }}>—</span>
         )}
       </td>
-      <td>
-        <span className={`tx-badge ${statusClass}`}>{statusLabel}</span>
-      </td>
+      <td><span className={`tx-badge ${cls}`}>{lbl}</span></td>
     </tr>
   )
 }
@@ -52,36 +37,36 @@ export function Blockchain() {
   const failed    = readings.filter(r => r.blockchain_status === 'failed').length
 
   return (
-    <div className="blockchain-v2">
-      <div style={{ marginBottom: 'var(--sp-6)' }}>
-        <h2 className="page-title">⛓️ Blockchain</h2>
+    <div className="blockchain-page">
+      <div className="page-header">
+        <span className="page-title">Blockchain</span>
       </div>
 
-      <div className="blockchain-v2__kpis">
-        <div className="bk-kpi bk-kpi--confirmed">
-          <div className="bk-kpi__value">{confirmed}</div>
-          <div className="bk-kpi__label">✓ Confirmados</div>
+      <div className="bk-kpis">
+        <div className="bk-kpi bk-kpi--ok">
+          <span className="bk-kpi__lbl">Confirmados</span>
+          <span className="bk-kpi__val">{confirmed}</span>
         </div>
-        <div className="bk-kpi bk-kpi--pending">
-          <div className="bk-kpi__value">{pending}</div>
-          <div className="bk-kpi__label">⏳ Pendentes</div>
+        <div className="bk-kpi bk-kpi--wait">
+          <span className="bk-kpi__lbl">Pendentes</span>
+          <span className="bk-kpi__val">{pending}</span>
         </div>
-        <div className="bk-kpi bk-kpi--failed">
-          <div className="bk-kpi__value">{failed}</div>
-          <div className="bk-kpi__label">✗ Falhas</div>
+        <div className="bk-kpi bk-kpi--fail">
+          <span className="bk-kpi__lbl">Falhas</span>
+          <span className="bk-kpi__val">{failed}</span>
         </div>
       </div>
 
-      <div className="blockchain-v2__table-wrap">
-        <div className="blockchain-v2__table-header">
-          <span className="dashboard-panel__title">⛓️ Transações Recentes</span>
-          <span className="dashboard-panel__badge">{readings.length} registros</span>
+      <div className="bk-table-wrap">
+        <div className="bk-table-head">
+          <span className="panel__title">Transações Recentes</span>
+          <span className="panel__meta">{readings.length} registros</span>
         </div>
 
         {loading ? (
-          <div className="loading-state">Carregando</div>
+          <div className="loading">Carregando</div>
         ) : readings.length === 0 ? (
-          <div className="empty-state">Nenhuma transação encontrada</div>
+          <div className="empty">Nenhuma transação</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="bk-table">
@@ -95,7 +80,7 @@ export function Blockchain() {
               </thead>
               <tbody>
                 {readings.map(r => (
-                  <TxRow key={r.id} reading={r} onHashClick={setExplorerHash} />
+                  <TxRow key={r.id} r={r} onHash={setExplorerHash} />
                 ))}
               </tbody>
             </table>

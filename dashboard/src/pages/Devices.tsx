@@ -2,56 +2,54 @@ import { useDevices } from '../hooks/useDevices'
 import { useRelativeTime } from '../hooks/useRelativeTime'
 import type { DeviceWithStatus } from '../types/device'
 
-const DEVICE_COLORS = ['#22c55e', '#f59e0b', '#3b82f6', '#a855f7', '#ec4899', '#14b8a6']
-
-function DeviceCardV2({ device, index }: { device: DeviceWithStatus; index: number }) {
-  const color = DEVICE_COLORS[index % DEVICE_COLORS.length]
+function DevCard({ device }: { device: DeviceWithStatus }) {
   const lastSeen = useRelativeTime(device.last_seen_at ?? '')
 
-  const pubKeyShort = device.public_key
+  const pubKey = device.public_key
     ? device.public_key
         .replace('-----BEGIN PUBLIC KEY-----', '')
         .replace('-----END PUBLIC KEY-----', '')
+        .replace(/\n/g, '')
         .trim()
-        .slice(0, 64) + '...'
+        .slice(0, 80) + '...'
     : '—'
 
   return (
-    <div className="device-card-v2" style={{ '--device-color': color } as React.CSSProperties}>
-      <div className="device-card-v2__header">
+    <div className="device-card">
+      <div className="device-card__head">
         <div>
-          <div className="device-card-v2__name">{device.name || device.device_id}</div>
-          <div className="device-card-v2__id">{device.device_id}</div>
+          <div className="device-card__name">{device.name || device.device_id}</div>
+          <div className="device-card__id">{device.device_id}</div>
         </div>
-        <span className={`device-item__badge device-item__badge--${device.isAlive ? 'online' : 'offline'}`}>
-          {device.isAlive ? '● online' : '○ offline'}
+        <span className={`device-card__state device-card__state--${device.isAlive ? 'on' : 'off'}`}>
+          {device.isAlive ? 'online' : 'offline'}
         </span>
       </div>
 
-      <div className="device-card-v2__rows">
+      <div className="device-card__rows">
         {device.location && (
-          <div className="device-card-v2__row">
-            <span className="device-card-v2__row-label">📍 Localização</span>
-            <span className="device-card-v2__row-value">{device.location}</span>
+          <div className="device-card__row">
+            <span className="device-card__row-key">Localização</span>
+            <span className="device-card__row-val">{device.location}</span>
           </div>
         )}
-        <div className="device-card-v2__row">
-          <span className="device-card-v2__row-label">📡 Leituras</span>
-          <span className="device-card-v2__row-value">{device.total_readings.toLocaleString('pt-BR')}</span>
+        <div className="device-card__row">
+          <span className="device-card__row-key">Leituras</span>
+          <span className="device-card__row-val">{device.total_readings.toLocaleString('pt-BR')}</span>
         </div>
-        <div className="device-card-v2__row">
-          <span className="device-card-v2__row-label">🕐 Último sinal</span>
-          <span className="device-card-v2__row-value">{device.last_seen_at ? lastSeen : 'Nunca'}</span>
+        <div className="device-card__row">
+          <span className="device-card__row-key">Último sinal</span>
+          <span className="device-card__row-val">{device.last_seen_at ? lastSeen : 'Nunca'}</span>
         </div>
-        <div className="device-card-v2__row">
-          <span className="device-card-v2__row-label">📅 Cadastrado</span>
-          <span className="device-card-v2__row-value">
+        <div className="device-card__row">
+          <span className="device-card__row-key">Cadastrado</span>
+          <span className="device-card__row-val">
             {new Date(device.created_at).toLocaleDateString('pt-BR')}
           </span>
         </div>
       </div>
 
-      <div className="device-card-v2__pubkey">{pubKeyShort}</div>
+      <div className="device-card__key">{pubKey}</div>
     </div>
   )
 }
@@ -60,25 +58,23 @@ export function Devices() {
   const { devices, loading, error } = useDevices()
 
   return (
-    <div className="devices-v2">
-      <div className="devices-v2__header">
-        <h2 className="page-title">
-          🛰️ Dispositivos
-          <span className="page-title__count">{devices.length} total</span>
-        </h2>
+    <div className="devices-page">
+      <div className="page-header">
+        <span className="page-title">
+          Dispositivos&ensp;
+          <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>{devices.length}</span>
+        </span>
       </div>
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && <div className="err">{error}</div>}
 
       {loading ? (
-        <div className="loading-state">Carregando dispositivos</div>
+        <div className="loading">Carregando</div>
       ) : devices.length === 0 ? (
-        <div className="empty-state">Nenhum dispositivo cadastrado</div>
+        <div className="empty">Nenhum dispositivo</div>
       ) : (
-        <div className="devices-v2__grid">
-          {devices.map((device, i) => (
-            <DeviceCardV2 key={device.id} device={device} index={i} />
-          ))}
+        <div className="device-grid">
+          {devices.map(d => <DevCard key={d.id} device={d} />)}
         </div>
       )}
     </div>

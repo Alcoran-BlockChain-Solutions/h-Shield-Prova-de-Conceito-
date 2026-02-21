@@ -1,44 +1,30 @@
 import { useState } from 'react'
-import type { BlockchainStatus as BlockchainStatusType } from '../types/reading'
+import type { BlockchainStatus as T } from '../types/reading'
 
-interface Props {
-  status: BlockchainStatusType
-  error: string | null
-}
+interface Props { status: T; error: string | null }
 
 export function BlockchainStatus({ status, error }: Props) {
-  const [showError, setShowError] = useState(false)
+  const [open, setOpen] = useState(false)
 
-  const label = {
-    pending:   '⏳ Pendente',
-    confirmed: '✓ Stellar',
-    failed:    '✗ Falhou',
-  }[status]
-
-  const cls = {
-    pending:   'tx-badge--pending',
-    confirmed: 'tx-badge--confirmed',
-    failed:    'tx-badge--failed',
-  }[status]
+  const cls = { pending: 'tx-badge--pending', confirmed: 'tx-badge--confirmed', failed: 'tx-badge--failed' }[status]
+  const lbl = { pending: 'Pendente', confirmed: 'Stellar OK', failed: 'Falhou' }[status]
 
   return (
     <>
       <span
         className={`tx-badge ${cls}`}
         style={{ cursor: error ? 'pointer' : 'default' }}
-        onClick={() => error && setShowError(true)}
+        onClick={() => error && setOpen(true)}
       >
-        {label}{error && ' ⓘ'}
+        {lbl}{error ? ' [!]' : ''}
       </span>
 
-      {showError && (
-        <div className="modal-overlay" onClick={() => setShowError(false)}>
+      {open && (
+        <div className="modal-overlay" onClick={() => setOpen(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal__header">
-              <div className="modal__title" style={{ color: 'var(--danger)' }}>
-                ✗ Erro Blockchain
-              </div>
-              <button className="modal__close" onClick={() => setShowError(false)}>✕</button>
+            <div className="modal__head">
+              <span className="modal__title" style={{ color: 'var(--red)' }}>Erro Blockchain</span>
+              <button className="modal__close" onClick={() => setOpen(false)}>✕</button>
             </div>
             <div className="modal__body">
               <pre>{error}</pre>

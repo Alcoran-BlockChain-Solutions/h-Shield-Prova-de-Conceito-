@@ -1,7 +1,4 @@
-interface Props {
-  txHash: string
-  onClick?: (hash: string) => void
-}
+interface Props { txHash: string; onClick?: (hash: string) => void }
 
 export function TransactionLink({ txHash, onClick }: Props) {
   const short = `${txHash.slice(0, 6)}…${txHash.slice(-6)}`
@@ -9,7 +6,7 @@ export function TransactionLink({ txHash, onClick }: Props) {
   if (onClick) {
     return (
       <button className="tx-link" onClick={() => onClick(txHash)} title={txHash}>
-        🔗 {short}
+        {short} ↗
       </button>
     )
   }
@@ -22,7 +19,7 @@ export function TransactionLink({ txHash, onClick }: Props) {
       rel="noreferrer"
       title={txHash}
     >
-      🔗 {short}
+      {short} ↗
     </a>
   )
 }
