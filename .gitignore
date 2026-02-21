@@ -31,3 +31,5 @@ firmware/include/config.h
 !firmware/include/config.example.h
 
 
+node_modules
+dist
