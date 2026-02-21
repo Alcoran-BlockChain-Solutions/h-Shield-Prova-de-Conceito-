@@ -387,16 +387,25 @@ const PhaseCol = ({ index, phase, items, color, done = false }) => (
   </div>
 )
 
-// ─── Footer template ────────────────────────────────────────────────────────────
+// ─── Footer template + progress bar ────────────────────────────────────────────
 const Template = ({ slideNumber, numberOfSlides }) => (
-  <FlexBox
-    justifyContent="space-between"
-    alignItems="center"
-    position="absolute"
-    bottom={0}
-    width={1}
-    style={{ padding: '0 48px 16px' }}
-  >
+  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+    {/* Progress bar */}
+    <div style={{ height: '2px', background: 'rgba(57,57,57,0.6)', width: '100%' }}>
+      <div style={{
+        height: '100%',
+        width: `${(slideNumber / numberOfSlides) * 100}%`,
+        background: '#0f62fe',
+        transition: 'width 0.3s ease',
+      }} />
+    </div>
+
+    {/* Footer row */}
+    <FlexBox
+      justifyContent="space-between"
+      alignItems="center"
+      style={{ padding: '6px 48px 12px' }}
+    >
     <div style={{
       fontFamily: FONT.mono, fontSize: '10px',
       color: 'rgba(244,244,244,0.18)', letterSpacing: '2px',
@@ -410,6 +419,7 @@ const Template = ({ slideNumber, numberOfSlides }) => (
       {slideNumber} / {numberOfSlides}
     </div>
   </FlexBox>
+  </div>
 )
 
 // ─── IBM Carbon — logo mark (3D cube) ──────────────────────────────────────────
@@ -498,43 +508,61 @@ export default function Presentation() {
             </div>
           </div>
 
-          {/* Right column — IBM Carbon-style data panel */}
+          {/* Right column — Agenda */}
           <div style={{
-            width: '260px',
+            width: '280px',
             background: C.surface,
             border: `1px solid ${C.border}`,
             borderTop: `2px solid ${C.blue}`,
-            padding: '24px',
             flexShrink: 0,
+            overflow: 'hidden',
           }}>
+            <div style={{
+              padding: '10px 16px',
+              borderBottom: `1px solid ${C.border}`,
+              fontFamily: FONT.mono, fontSize: '10px',
+              color: C.muted, letterSpacing: '2px',
+              textTransform: 'uppercase',
+            }}>
+              Agenda
+            </div>
             {[
-              { k: 'Formato', v: 'Pitch ao vivo' },
-              { k: 'Duração', v: '5–10 minutos' },
-              { k: 'Objetivo', v: 'Parceria + Seed' },
-              { k: 'Stack', v: 'ESP32 + Stellar' },
-              { k: 'Status', v: 'MVP ativo', green: true },
-            ].map(({ k, v, green }) => (
-              <div key={k} style={{
+              { n: '01', label: 'O problema do banco',        time: '1 min' },
+              { n: '02', label: 'Tamanho do mercado',          time: '30s' },
+              { n: '03', label: 'Como a fraude acontece',      time: '1 min' },
+              { n: '04', label: 'Nossa solução',               time: '1 min' },
+              { n: '05', label: 'Demo ao vivo',                time: '1:30' },
+              { n: '06', label: 'Arquitetura de segurança',    time: '30s' },
+              { n: '07', label: 'Modelo de negócio',           time: '1 min' },
+              { n: '08', label: 'Phase 2 — hardware',          time: '30s' },
+              { n: '09', label: 'O que pedimos ao Bradesco',   time: '1 min' },
+              { n: '10', label: 'Call to action',              time: '30s' },
+            ].map(({ n, label, time }) => (
+              <div key={n} style={{
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                marginBottom: '12px',
-                paddingBottom: '12px',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '8px 16px',
                 borderBottom: `1px solid ${C.border}`,
               }}>
                 <span style={{
                   fontFamily: FONT.mono, fontSize: '10px',
-                  color: C.muted, letterSpacing: '1px',
+                  color: C.blue, minWidth: '20px',
+                  letterSpacing: '0.5px',
                 }}>
-                  {k}
+                  {n}
                 </span>
                 <span style={{
-                  fontFamily: FONT.body, fontSize: '13px',
-                  color: green ? C.green : C.text,
-                  fontWeight: green ? 600 : 400,
-                  textAlign: 'right',
+                  fontFamily: FONT.body, fontSize: '12px',
+                  color: C.dim, flex: 1, lineHeight: 1.3,
                 }}>
-                  {v}
+                  {label}
+                </span>
+                <span style={{
+                  fontFamily: FONT.mono, fontSize: '10px',
+                  color: C.muted, flexShrink: 0,
+                }}>
+                  {time}
                 </span>
               </div>
             ))}
