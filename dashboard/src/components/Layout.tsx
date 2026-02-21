@@ -1,46 +1,49 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { useTheme } from '../contexts/ThemeContext'
 import { ConnectionStatus } from './ConnectionStatus'
 
-export function Layout() {
-  const { theme, toggleTheme } = useTheme()
+const TABS = [
+  { to: '/',            label: 'Visão Geral', icon: '🌿', end: true },
+  { to: '/analytics',  label: 'Analytics',   icon: '📊' },
+  { to: '/devices',    label: 'Dispositivos', icon: '🛰️' },
+  { to: '/blockchain', label: 'Blockchain',   icon: '⛓️' },
+]
 
+export function Layout() {
   return (
     <div className="layout">
-      <header className="layout__header">
-        <div className="layout__brand">
-          <h1>HarvestShield</h1>
+      <header className="topbar">
+        <div className="topbar__main">
+          <div className="topbar__brand">
+            <div className="topbar__logo">🌱</div>
+            <span className="topbar__name">
+              Harvest<span>Shield</span>
+            </span>
+          </div>
+          <div className="topbar__spacer" />
+          <div className="topbar__right">
+            <ConnectionStatus />
+            <div className="topbar__farm">
+              <span>📍</span>
+              Fazenda Norte
+            </div>
+          </div>
         </div>
 
-        <nav className="layout__nav">
-          <NavLink
-            to="/"
-            className={({ isActive }) =>
-              `layout__nav-link ${isActive ? 'layout__nav-link--active' : ''}`
-            }
-          >
-            Realtime
-          </NavLink>
-          <NavLink
-            to="/analytics"
-            className={({ isActive }) =>
-              `layout__nav-link ${isActive ? 'layout__nav-link--active' : ''}`
-            }
-          >
-            Analytics
-          </NavLink>
+        <nav className="topbar__tabs">
+          {TABS.map(tab => (
+            <NavLink
+              key={tab.to}
+              to={tab.to}
+              end={tab.end}
+              className={({ isActive }) =>
+                `topbar__tab${isActive ? ' topbar__tab--active' : ''}`
+              }
+            >
+              <span className="topbar__tab-icon">{tab.icon}</span>
+              {tab.label}
+            </NavLink>
+          ))}
         </nav>
-
-        <div className="layout__actions">
-          <ConnectionStatus />
-          <button
-            onClick={toggleTheme}
-            className="layout__theme-toggle"
-            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-          >
-            {theme === 'light' ? '🌙' : '☀️'}
-          </button>
-        </div>
       </header>
 
       <main className="layout__content">
