@@ -62,7 +62,7 @@ export function Devices() {
       <div className="page-header">
         <span className="page-title">
           Dispositivos&ensp;
-          <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>{devices.length}</span>
+          <span style={{ color: 'var(--t-03)', fontWeight: 400 }}>{devices.length}</span>
         </span>
       </div>
 

@@ -23,7 +23,7 @@ export function BlockchainStatus({ status, error }: Props) {
         <div className="modal-overlay" onClick={() => setOpen(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal__head">
-              <span className="modal__title" style={{ color: 'var(--red)' }}>Erro Blockchain</span>
+              <span className="modal__title" style={{ color: 'var(--red)' }}>Blockchain Error</span>
               <button className="modal__close" onClick={() => setOpen(false)}>✕</button>
             </div>
             <div className="modal__body">

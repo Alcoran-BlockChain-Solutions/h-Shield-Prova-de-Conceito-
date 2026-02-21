@@ -14,28 +14,38 @@ const PERIODS: { value: TimePeriod; label: string }[] = [
   { value: 'all', label: 'Total' },
 ]
 
+// IBM Carbon chart tooltip
 const TOOLTIP = {
   contentStyle: {
-    background: '#0d1411',
-    border: '1px solid rgba(255,255,255,0.07)',
+    background: '#262626',
+    border: '1px solid #393939',
     borderRadius: 0,
-    color: '#e4eeeb',
+    color: '#f4f4f4',
     fontSize: '0.75rem',
     fontFamily: "'IBM Plex Mono', monospace",
+    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
   },
-  itemStyle: { color: '#e4eeeb' },
-  labelStyle: { color: '#3d5a50', fontSize: '0.625rem' },
+  itemStyle: { color: '#c6c6c6' },
+  labelStyle: { color: '#8d8d8d', fontSize: '0.625rem', marginBottom: 4 },
+}
+
+// IBM Carbon chart axes
+const AXIS_TICK = {
+  fill: '#6f6f6f',
+  fontSize: 10,
+  fontFamily: 'IBM Plex Mono',
 }
 
 function tick(ts: string) {
   return new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
+// IBM Carbon chart colors (deliberate, not random)
 const SENSORS = [
-  { key: 'temperature' as const, label: 'Temperatura', unit: '°C', color: '#e84040', dp: 1 },
-  { key: 'humidityAir' as const, label: 'Umidade do Ar', unit: '%', color: '#4090e8', dp: 1 },
-  { key: 'humiditySoil' as const, label: 'Umidade do Solo', unit: '%', color: '#c8f53a', dp: 1 },
-  { key: 'luminosity' as const, label: 'Luminosidade', unit: 'lx', color: '#e8a930', dp: 0 },
+  { key: 'temperature' as const,  label: 'Temperatura',     unit: '°C', color: '#fa4d56', dp: 1 },
+  { key: 'humidityAir' as const,  label: 'Umidade do Ar',   unit: '%',  color: '#4589ff', dp: 1 },
+  { key: 'humiditySoil' as const, label: 'Umidade do Solo', unit: '%',  color: '#42be65', dp: 1 },
+  { key: 'luminosity' as const,   label: 'Luminosidade',    unit: 'lx', color: '#f1c21b', dp: 0 },
 ]
 
 export function Analytics() {
@@ -78,7 +88,7 @@ export function Analytics() {
                     <span className="stat-cell__unit">{s.unit}</span>
                   </div>
                   <div className="stat-cell__range">
-                    ↓ {st.min.toFixed(s.dp)}  ↑ {st.max.toFixed(s.dp)}
+                    ↓ {st.min.toFixed(s.dp)} &nbsp; ↑ {st.max.toFixed(s.dp)}
                   </div>
                 </div>
               )
@@ -91,12 +101,12 @@ export function Analytics() {
               <div className="chart-box__label">Temperatura</div>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={data.temperature.data}>
-                  <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.04)" />
-                  <XAxis dataKey="timestamp" tickFormatter={tick} tick={{ fill: '#3d5a50', fontSize: 10, fontFamily: 'IBM Plex Mono' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#3d5a50', fontSize: 10, fontFamily: 'IBM Plex Mono' }} axisLine={false} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="timestamp" tickFormatter={tick} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                  <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={36} />
                   <Tooltip {...TOOLTIP} labelFormatter={tick} formatter={(v: number | undefined) => [v != null ? `${v.toFixed(1)} °C` : '—', '']} />
-                  <Line type="monotone" dataKey="value" stroke="#e84040" dot={false} strokeWidth={1.5} />
-                  <Line type="monotone" dataKey="smaShort" stroke="#e84040" dot={false} strokeWidth={1} strokeDasharray="3 4" opacity={0.4} />
+                  <Line type="monotone" dataKey="value" stroke="#fa4d56" dot={false} strokeWidth={1.5} />
+                  <Line type="monotone" dataKey="smaShort" stroke="#fa4d56" dot={false} strokeWidth={1} strokeDasharray="4 4" opacity={0.35} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -107,11 +117,11 @@ export function Analytics() {
                 <div className="chart-box__label">Umidade do Ar</div>
                 <ResponsiveContainer width="100%" height={160}>
                   <AreaChart data={data.humidityAir.data}>
-                    <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="timestamp" tickFormatter={tick} tick={{ fill: '#3d5a50', fontSize: 10, fontFamily: 'IBM Plex Mono' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: '#3d5a50', fontSize: 10, fontFamily: 'IBM Plex Mono' }} axisLine={false} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="timestamp" tickFormatter={tick} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                    <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={36} />
                     <Tooltip {...TOOLTIP} labelFormatter={tick} formatter={(v: number | undefined) => [v != null ? `${v.toFixed(1)} %` : '—', '']} />
-                    <Area type="monotone" dataKey="value" stroke="#4090e8" fill="#4090e8" fillOpacity={0.06} strokeWidth={1.5} dot={false} />
+                    <Area type="monotone" dataKey="value" stroke="#4589ff" fill="#4589ff" fillOpacity={0.08} strokeWidth={1.5} dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -121,11 +131,11 @@ export function Analytics() {
                 <div className="chart-box__label">Umidade do Solo</div>
                 <ResponsiveContainer width="100%" height={160}>
                   <AreaChart data={data.humiditySoil.data}>
-                    <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="timestamp" tickFormatter={tick} tick={{ fill: '#3d5a50', fontSize: 10, fontFamily: 'IBM Plex Mono' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: '#3d5a50', fontSize: 10, fontFamily: 'IBM Plex Mono' }} axisLine={false} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="timestamp" tickFormatter={tick} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                    <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={36} />
                     <Tooltip {...TOOLTIP} labelFormatter={tick} formatter={(v: number | undefined) => [v != null ? `${v.toFixed(1)} %` : '—', '']} />
-                    <Area type="monotone" dataKey="value" stroke="#c8f53a" fill="#c8f53a" fillOpacity={0.06} strokeWidth={1.5} dot={false} />
+                    <Area type="monotone" dataKey="value" stroke="#42be65" fill="#42be65" fillOpacity={0.08} strokeWidth={1.5} dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -136,11 +146,11 @@ export function Analytics() {
               <div className="chart-box__label">Luminosidade</div>
               <ResponsiveContainer width="100%" height={160}>
                 <AreaChart data={data.luminosity.data}>
-                  <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.04)" />
-                  <XAxis dataKey="timestamp" tickFormatter={tick} tick={{ fill: '#3d5a50', fontSize: 10, fontFamily: 'IBM Plex Mono' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#3d5a50', fontSize: 10, fontFamily: 'IBM Plex Mono' }} axisLine={false} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 6" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="timestamp" tickFormatter={tick} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                  <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={36} />
                   <Tooltip {...TOOLTIP} labelFormatter={tick} formatter={(v: number | undefined) => [v != null ? `${v.toFixed(0)} lx` : '—', '']} />
-                  <Area type="monotone" dataKey="value" stroke="#e8a930" fill="#e8a930" fillOpacity={0.06} strokeWidth={1.5} dot={false} />
+                  <Area type="monotone" dataKey="value" stroke="#f1c21b" fill="#f1c21b" fillOpacity={0.08} strokeWidth={1.5} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

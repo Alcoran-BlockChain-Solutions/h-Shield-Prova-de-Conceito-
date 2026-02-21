@@ -13,14 +13,14 @@ function TxRow({ r, onHash }: { r: Reading; onHash: (h: string) => void }) {
   return (
     <tr>
       <td><span className="bk-table__dev">{r.device_id}</span></td>
-      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.625rem', color: 'var(--ink-3)' }}>{rel}</td>
+      <td style={{ fontFamily: 'var(--mono)', fontSize: '0.75rem', color: 'var(--t-03)' }}>{rel}</td>
       <td>
         {r.blockchain_tx_hash ? (
           <button className="bk-table__hash" onClick={() => onHash(r.blockchain_tx_hash!)} title={r.blockchain_tx_hash}>
             {r.blockchain_tx_hash.slice(0, 8)}…{r.blockchain_tx_hash.slice(-8)}
           </button>
         ) : (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.625rem', color: 'var(--ink-3)' }}>—</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '0.75rem', color: 'var(--t-03)' }}>—</span>
         )}
       </td>
       <td><span className={`tx-badge ${cls}`}>{lbl}</span></td>
