@@ -1,133 +1,151 @@
 import { useState } from 'react'
 import { useAnalyticsData, type TimePeriod } from '../hooks/useAnalyticsData'
-import { StatCard } from '../components/charts/StatCard'
-import { SensorLineChart } from '../components/charts/SensorLineChart'
-import { SensorAreaChart } from '../components/charts/SensorAreaChart'
+import {
+  LineChart, Line, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from 'recharts'
 
-const PERIOD_OPTIONS: { value: TimePeriod; label: string }[] = [
-  { value: '1h', label: '1 hora' },
-  { value: '6h', label: '6 horas' },
-  { value: '24h', label: '24 horas' },
-  { value: '7d', label: '7 dias' },
-  { value: '30d', label: '30 dias' },
-  { value: 'all', label: 'Total' }
+const PERIODS: { value: TimePeriod; label: string }[] = [
+  { value: '1h',  label: '1h' },
+  { value: '6h',  label: '6h' },
+  { value: '24h', label: '24h' },
+  { value: '7d',  label: '7d' },
+  { value: '30d', label: '30d' },
+  { value: 'all', label: 'Total' },
 ]
 
-const SENSOR_COLORS = {
-  temperature: '#f44336',
-  humidityAir: '#2196f3',
-  humiditySoil: '#4caf50',
-  luminosity: '#ff9800'
+const SENSORS = [
+  { key: 'temperature' as const,  icon: '🌡️', label: 'Temperatura',    unit: '°C', color: '#ef4444' },
+  { key: 'humidityAir' as const,  icon: '💧', label: 'Umidade do Ar',  unit: '%',  color: '#3b82f6' },
+  { key: 'humiditySoil' as const, icon: '🌱', label: 'Umidade do Solo', unit: '%',  color: '#22c55e' },
+  { key: 'luminosity' as const,   icon: '☀️', label: 'Luminosidade',   unit: 'lx', color: '#f59e0b' },
+]
+
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    background: '#112a16',
+    border: '1px solid rgba(34,197,94,0.2)',
+    borderRadius: 8,
+    color: '#e2e8f0',
+    fontSize: '0.8125rem',
+  }
+}
+
+function formatTick(ts: string) {
+  return new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 export function Analytics() {
   const [period, setPeriod] = useState<TimePeriod>('all')
-
   const { data, loading, error, totalReadings, deviceCount } = useAnalyticsData({ period })
 
   return (
-    <div className="analytics">
-      <div className="analytics__header">
-        <h2>Analytics</h2>
-        <div className="analytics__filters">
-          <div className="analytics__filter">
-            <label htmlFor="period-select">Período</label>
-            <select
-              id="period-select"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value as TimePeriod)}
-              className="analytics__select"
+    <div className="analytics-v2">
+      <div className="analytics-v2__header">
+        <h2 className="analytics-v2__title">📊 Analytics</h2>
+        <div className="period-selector">
+          {PERIODS.map(p => (
+            <button
+              key={p.value}
+              className={`period-btn${period === p.value ? ' period-btn--active' : ''}`}
+              onClick={() => setPeriod(p.value)}
             >
-              {PERIOD_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              {p.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {error && (
-        <div className="error-message">Erro ao carregar dados: {error}</div>
-      )}
+      {error && <div className="error-banner">Erro: {error}</div>}
 
       {loading ? (
-        <div className="loading">Carregando dados...</div>
+        <div className="loading-state">Carregando dados</div>
       ) : totalReadings === 0 ? (
-        <div className="empty-state">Nenhum dado encontrado para o período selecionado</div>
+        <div className="empty-state">Nenhum dado para o período selecionado</div>
       ) : (
         <>
-          <div className="analytics__stats">
-            <StatCard
-              icon="🌡️"
-              label="Temperatura"
-              value={data.temperature.stats.avg.toFixed(1)}
-              unit="°C"
-              subLabel="média"
-              color={SENSOR_COLORS.temperature}
-            />
-            <StatCard
-              icon="💧"
-              label="Umidade do Ar"
-              value={data.humidityAir.stats.avg.toFixed(1)}
-              unit="%"
-              subLabel="média"
-              color={SENSOR_COLORS.humidityAir}
-            />
-            <StatCard
-              icon="🌱"
-              label="Umidade do Solo"
-              value={data.humiditySoil.stats.avg.toFixed(1)}
-              unit="%"
-              subLabel="média"
-              color={SENSOR_COLORS.humiditySoil}
-            />
-            <StatCard
-              icon="☀️"
-              label="Luminosidade"
-              value={data.luminosity.stats.avg.toFixed(0)}
-              unit=" lx"
-              subLabel="média"
-              color={SENSOR_COLORS.luminosity}
-            />
+          <div className="analytics-v2__stats">
+            {SENSORS.map(s => {
+              const stats = data[s.key].stats
+              return (
+                <div
+                  key={s.key}
+                  className="stat-card-v2"
+                  style={{ '--stat-color': s.color } as React.CSSProperties}
+                >
+                  <span className="stat-card-v2__icon">{s.icon}</span>
+                  <div className="stat-card-v2__label">{s.label}</div>
+                  <div className="stat-card-v2__value">
+                    {stats.avg.toFixed(s.key === 'luminosity' ? 0 : 1)}
+                    <span className="stat-card-v2__unit">{s.unit}</span>
+                  </div>
+                  <div className="stat-card-v2__sub">
+                    min {stats.min.toFixed(1)} · max {stats.max.toFixed(1)}
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
-          <div className="analytics__charts">
-            <SensorLineChart
-              title="Temperatura"
-              data={data.temperature.data}
-              unit="°C"
-              color={SENSOR_COLORS.temperature}
-            />
-
-            <div className="analytics__charts-row">
-              <SensorAreaChart
-                title="Umidade do Ar"
-                data={data.humidityAir.data}
-                unit="%"
-                color={SENSOR_COLORS.humidityAir}
-              />
-              <SensorAreaChart
-                title="Umidade do Solo"
-                data={data.humiditySoil.data}
-                unit="%"
-                color={SENSOR_COLORS.humiditySoil}
-              />
+          <div className="analytics-v2__charts">
+            <div className="chart-card">
+              <div className="chart-card__title">🌡️ Temperatura</div>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={data.temperature.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,197,94,0.08)" />
+                  <XAxis dataKey="timestamp" tickFormatter={formatTick} tick={{ fill: '#6b9e7a', fontSize: 11 }} />
+                  <YAxis tick={{ fill: '#6b9e7a', fontSize: 11 }} />
+                  <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTick} formatter={(v: number | undefined) => [v != null ? `${v.toFixed(1)} °C` : '—', 'Temperatura']} />
+                  <Line type="monotone" dataKey="value" stroke="#ef4444" dot={false} strokeWidth={2} />
+                  <Line type="monotone" dataKey="smaShort" stroke="#ef4444" dot={false} strokeWidth={1} strokeDasharray="4 2" opacity={0.5} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
 
-            <SensorLineChart
-              title="Luminosidade"
-              data={data.luminosity.data}
-              unit=" lx"
-              color={SENSOR_COLORS.luminosity}
-            />
+            <div className="analytics-v2__charts-row">
+              <div className="chart-card">
+                <div className="chart-card__title">💧 Umidade do Ar</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={data.humidityAir.data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,197,94,0.08)" />
+                    <XAxis dataKey="timestamp" tickFormatter={formatTick} tick={{ fill: '#6b9e7a', fontSize: 11 }} />
+                    <YAxis tick={{ fill: '#6b9e7a', fontSize: 11 }} />
+                    <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTick} formatter={(v: number | undefined) => [v != null ? `${v.toFixed(1)} %` : '—', 'Umidade Ar']} />
+                    <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.08} strokeWidth={2} dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="chart-card">
+                <div className="chart-card__title">🌱 Umidade do Solo</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={data.humiditySoil.data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,197,94,0.08)" />
+                    <XAxis dataKey="timestamp" tickFormatter={formatTick} tick={{ fill: '#6b9e7a', fontSize: 11 }} />
+                    <YAxis tick={{ fill: '#6b9e7a', fontSize: 11 }} />
+                    <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTick} formatter={(v: number | undefined) => [v != null ? `${v.toFixed(1)} %` : '—', 'Umidade Solo']} />
+                    <Area type="monotone" dataKey="value" stroke="#22c55e" fill="#22c55e" fillOpacity={0.08} strokeWidth={2} dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="chart-card">
+              <div className="chart-card__title">☀️ Luminosidade</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={data.luminosity.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,197,94,0.08)" />
+                  <XAxis dataKey="timestamp" tickFormatter={formatTick} tick={{ fill: '#6b9e7a', fontSize: 11 }} />
+                  <YAxis tick={{ fill: '#6b9e7a', fontSize: 11 }} />
+                  <Tooltip {...TOOLTIP_STYLE} labelFormatter={formatTick} formatter={(v: number | undefined) => [v != null ? `${v.toFixed(0)} lx` : '—', 'Luminosidade']} />
+                  <Area type="monotone" dataKey="value" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.08} strokeWidth={2} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          <div className="analytics__footer">
-            <span className="analytics__total">
-              {totalReadings} leituras de {deviceCount} dispositivo{deviceCount !== 1 ? 's' : ''} no período
-            </span>
+          <div className="analytics-v2__footer">
+            {totalReadings} leituras · {deviceCount} dispositivo{deviceCount !== 1 ? 's' : ''} · período: {PERIODS.find(p => p.value === period)?.label}
           </div>
         </>
       )}

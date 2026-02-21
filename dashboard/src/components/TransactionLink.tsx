@@ -1,31 +1,28 @@
-import { STELLAR_EXPLORER, DEFAULT_STELLAR_NETWORK } from '../config/constants'
-
-interface TransactionLinkProps {
+interface Props {
   txHash: string
-  onClick?: (txHash: string) => void
+  onClick?: (hash: string) => void
 }
 
-export function TransactionLink({ txHash, onClick }: TransactionLinkProps) {
-  const shortHash = `${txHash.slice(0, 8)}...${txHash.slice(-8)}`
-  const explorerUrl = `${STELLAR_EXPLORER[DEFAULT_STELLAR_NETWORK]}/tx/${txHash}`
+export function TransactionLink({ txHash, onClick }: Props) {
+  const short = `${txHash.slice(0, 6)}…${txHash.slice(-6)}`
 
-  const handleClick = (e: React.MouseEvent) => {
-    if (onClick) {
-      e.preventDefault()
-      onClick(txHash)
-    }
+  if (onClick) {
+    return (
+      <button className="tx-link" onClick={() => onClick(txHash)} title={txHash}>
+        🔗 {short}
+      </button>
+    )
   }
 
   return (
     <a
-      href={explorerUrl}
-      className="transaction-link-btn"
-      onClick={handleClick}
+      className="tx-link"
+      href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noreferrer"
       title={txHash}
     >
-      view on-chain {shortHash}
+      🔗 {short}
     </a>
   )
 }
