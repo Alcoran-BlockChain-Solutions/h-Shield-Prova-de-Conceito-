@@ -9,7 +9,8 @@ const PERIOD_OPTIONS: { value: TimePeriod; label: string }[] = [
   { value: '6h', label: '6 horas' },
   { value: '24h', label: '24 horas' },
   { value: '7d', label: '7 dias' },
-  { value: '30d', label: '30 dias' }
+  { value: '30d', label: '30 dias' },
+  { value: 'all', label: 'Total' }
 ]
 
 const SENSOR_COLORS = {
@@ -20,7 +21,7 @@ const SENSOR_COLORS = {
 }
 
 export function Analytics() {
-  const [period, setPeriod] = useState<TimePeriod>('24h')
+  const [period, setPeriod] = useState<TimePeriod>('all')
 
   const { data, loading, error, totalReadings, deviceCount } = useAnalyticsData({ period })
 

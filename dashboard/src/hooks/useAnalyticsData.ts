@@ -3,7 +3,7 @@ import { supabase } from '../config/supabase'
 import type { Reading } from '../types/reading'
 import { calculateSMA } from '../utils/statistics'
 
-export type TimePeriod = '1h' | '6h' | '24h' | '7d' | '30d'
+export type TimePeriod = '1h' | '6h' | '24h' | '7d' | '30d' | 'all'
 
 interface UseAnalyticsDataParams {
   period: TimePeriod
@@ -32,13 +32,14 @@ interface AnalyticsData {
   luminosity: SensorAnalytics
 }
 
-function getPeriodMs(period: TimePeriod): number {
+function getPeriodMs(period: TimePeriod): number | null {
   switch (period) {
     case '1h': return 60 * 60 * 1000
     case '6h': return 6 * 60 * 60 * 1000
     case '24h': return 24 * 60 * 60 * 1000
     case '7d': return 7 * 24 * 60 * 60 * 1000
     case '30d': return 30 * 24 * 60 * 60 * 1000
+    case 'all': return null
   }
 }
 
@@ -133,13 +134,18 @@ export function useAnalyticsData({ period }: UseAnalyticsDataParams) {
     setError(null)
 
     const periodMs = getPeriodMs(period)
-    const startDate = new Date(Date.now() - periodMs).toISOString()
 
-    const { data, error: fetchError } = await supabase
+    let query = supabase
       .from('readings')
       .select('*')
-      .gte('created_at', startDate)
       .order('created_at', { ascending: true })
+
+    if (periodMs !== null) {
+      const startDate = new Date(Date.now() - periodMs).toISOString()
+      query = query.gte('created_at', startDate)
+    }
+
+    const { data, error: fetchError } = await query
 
     if (fetchError) {
       setError(fetchError.message)
