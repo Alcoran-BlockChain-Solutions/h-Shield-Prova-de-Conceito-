@@ -4,7 +4,7 @@ import {
 } from 'spectacle'
 
 // ─── Dashboard URL ─────────────────────────────────────────────────────────────
-const DASHBOARD_URL = 'http://localhost:3004'
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || 'http://localhost:3004'
 
 // ─── IBM Carbon Design System — Dark G100 ──────────────────────────────────────
 const C = {
