@@ -456,7 +456,7 @@ export default function Presentation() {
                 fontFamily: FONT.body, fontSize: '13px',
                 color: C.dim, fontWeight: 400,
               }}>
-                HarvestShield · inovaBra Bradesco 2026
+                Alcoran Blockchain Solutions · inovaBra Bradesco 2026
               </div>
             </div>
 
@@ -496,13 +496,13 @@ export default function Presentation() {
               maxWidth: '480px',
               marginBottom: '32px',
             }}>
-              Monitoramento agrícola com dados{' '}
-              <span style={{ color: C.text, fontWeight: 600 }}>verificados e imutáveis</span>{' '}
-              em blockchain — para crédito rural e seguros sem fraude.
+              Piloto técnico de validação climática para{' '}
+              <span style={{ color: C.text, fontWeight: 600 }}>automação de seguros paramétricos agrícolas</span>{' '}
+              — dados verificados, imutáveis, auditáveis.
             </div>
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['IoT — ESP32', 'Blockchain Stellar', 'Seguros Agrícolas'].map(t => (
+              {['IoT — ESP32', 'Blockchain Stellar', 'Seguro Paramétrico'].map(t => (
                 <Tag key={t}>{t}</Tag>
               ))}
             </div>
@@ -529,12 +529,12 @@ export default function Presentation() {
             {[
               { n: '01', label: 'O problema do banco',        time: '1 min' },
               { n: '02', label: 'Tamanho do mercado',          time: '30s' },
-              { n: '03', label: 'Como a fraude acontece',      time: '1 min' },
+              { n: '03', label: 'Falhas do processo atual',      time: '1 min' },
               { n: '04', label: 'Nossa solução',               time: '1 min' },
               { n: '05', label: 'Demo ao vivo',                time: '1:30' },
               { n: '06', label: 'Arquitetura de segurança',    time: '30s' },
               { n: '07', label: 'Modelo de negócio',           time: '1 min' },
-              { n: '08', label: 'Phase 2 — hardware',          time: '30s' },
+              { n: '08', label: 'Piloto de 90 dias',            time: '30s' },
               { n: '09', label: 'O que pedimos ao Bradesco',   time: '1 min' },
               { n: '10', label: 'Call to action',              time: '30s' },
             ].map(({ n, label, time }) => (
@@ -615,29 +615,55 @@ export default function Presentation() {
 
           <Appear>
             <div style={{
-              background: 'rgba(250,77,86,0.06)',
-              border: '1px solid rgba(250,77,86,0.2)',
-              borderLeft: '3px solid rgba(250,77,86,0.7)',
-              padding: '16px 20px',
-              maxWidth: '640px',
+              display: 'flex', gap: '12px', maxWidth: '720px',
             }}>
               <div style={{
-                fontFamily: FONT.body,
-                fontSize: '20px',
-                color: C.text,
-                lineHeight: 1.55,
-                fontStyle: 'italic',
+                flex: 1,
+                background: 'rgba(250,77,86,0.06)',
+                border: '1px solid rgba(250,77,86,0.2)',
+                borderLeft: '3px solid rgba(250,77,86,0.7)',
+                padding: '16px 20px',
               }}>
-                "Quantos foram baseados em dados que poderiam ter sido{' '}
-                <span style={{ color: C.red, fontStyle: 'normal', fontWeight: 600 }}>
-                  manipulados?
-                </span>"
+                <div style={{
+                  fontFamily: FONT.mono, fontSize: '10px',
+                  color: 'rgba(250,77,86,0.55)', letterSpacing: '1.5px',
+                  marginBottom: '6px',
+                }}>PROCESSO ATUAL</div>
+                <div style={{
+                  fontFamily: FONT.display, fontWeight: 700,
+                  fontSize: '40px', color: C.red, lineHeight: 1,
+                }}>30–90 dias</div>
+                <div style={{
+                  fontFamily: FONT.body, fontSize: '13px',
+                  color: C.dim, marginTop: '4px',
+                }}>média para liquidação de sinistro</div>
+              </div>
+              <div style={{
+                flex: 1,
+                background: 'rgba(250,77,86,0.06)',
+                border: '1px solid rgba(250,77,86,0.2)',
+                borderLeft: '3px solid rgba(250,77,86,0.7)',
+                padding: '16px 20px',
+              }}>
+                <div style={{
+                  fontFamily: FONT.mono, fontSize: '10px',
+                  color: 'rgba(250,77,86,0.55)', letterSpacing: '1.5px',
+                  marginBottom: '6px',
+                }}>CUSTO POR EVENTO</div>
+                <div style={{
+                  fontFamily: FONT.display, fontWeight: 700,
+                  fontSize: '40px', color: C.red, lineHeight: 1,
+                }}>R$ 2.500</div>
+                <div style={{
+                  fontFamily: FONT.body, fontSize: '13px',
+                  color: C.dim, marginTop: '4px',
+                }}>vistoria, laudo, análise, reconciliação</div>
               </div>
             </div>
           </Appear>
         </FlexBox>
         <Notes>
-          PAUSA de 3 segundos após R$ 16 BI. Deixe o número impactar. Só então avance.
+          PAUSA de 3 segundos após R$ 16 BI. Deixe o número impactar. Então: "Todo esse volume processado manualmente, de forma lenta e subjetiva. Há uma forma melhor."
         </Notes>
       </Slide>
 
@@ -687,7 +713,7 @@ export default function Presentation() {
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
-          <Label color={C.red}>Fragilidade do processo atual</Label>
+          <Label color={C.red}>Por que o modelo tradicional falha</Label>
           <div style={{
             fontFamily: FONT.display,
             fontWeight: 700,
@@ -753,7 +779,7 @@ export default function Presentation() {
             border: `1px solid ${C.border}`,
             padding: '20px 24px',
             gap: 0,
-            marginBottom: '16px',
+            marginBottom: '10px',
           }}>
             <FlowNode label="ESP32" sub="Sensor IoT" />
             <Arrow />
@@ -782,6 +808,38 @@ export default function Presentation() {
               }}>
                 API verificada
               </div>
+            </div>
+          </div>
+
+          {/* Camada 2 — Validação cruzada */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: 'rgba(38,38,38,0.6)',
+            border: `1px solid ${C.border}`,
+            borderTop: 'none',
+            padding: '10px 24px',
+            marginBottom: '10px',
+          }}>
+            <div style={{
+              fontFamily: FONT.mono, fontSize: '10px',
+              color: C.muted, letterSpacing: '1.5px', minWidth: '120px',
+            }}>
+              VALIDAÇÃO CRUZADA
+            </div>
+            {['INMET', 'CPTEC/INPE', 'NOAA', 'Sentinel / ESA'].map((src, i) => (
+              <div key={i} style={{
+                fontFamily: FONT.mono, fontSize: '10px',
+                color: C.blueLt, border: `1px solid rgba(69,137,255,0.2)`,
+                padding: '3px 8px', letterSpacing: '0.5px',
+              }}>
+                {src}
+              </div>
+            ))}
+            <div style={{
+              fontFamily: FONT.body, fontSize: '11px',
+              color: C.muted, marginLeft: '8px',
+            }}>
+              R² {'>'} 0,85
             </div>
           </div>
 
@@ -981,16 +1039,61 @@ export default function Presentation() {
           <Appear>
             <div style={{
               marginTop: '18px',
-              fontFamily: FONT.body, fontSize: '14px',
-              color: C.dim, textAlign: 'center', fontStyle: 'italic',
+              display: 'flex', gap: '0',
+              border: `1px solid ${C.border}`,
+              overflow: 'hidden',
             }}>
-              Para o Bradesco: dados verificados integráveis diretamente aos sistemas de crédito rural e Bradesco Seguros.
+              {[
+                { label: 'Liquidação do sinistro', before: '30–90 dias', after: '< 72h' },
+                { label: 'Custo por evento', before: 'R$ 800–2.500', after: 'R$ 50–150' },
+                { label: 'Contestação / disputa', before: '15–30%', after: '< 2%' },
+              ].map((row, i) => (
+                <div key={i} style={{
+                  flex: 1,
+                  borderRight: i < 2 ? `1px solid ${C.border}` : 'none',
+                }}>
+                  <div style={{
+                    fontFamily: FONT.mono, fontSize: '10px',
+                    color: C.muted, letterSpacing: '1px',
+                    padding: '6px 12px',
+                    borderBottom: `1px solid ${C.border}`,
+                    background: C.surface,
+                  }}>
+                    {row.label}
+                  </div>
+                  <div style={{ display: 'flex' }}>
+                    <div style={{
+                      flex: 1, padding: '8px 12px',
+                      borderRight: `1px solid ${C.border}`,
+                    }}>
+                      <div style={{
+                        fontFamily: FONT.mono, fontSize: '9px',
+                        color: C.muted, marginBottom: '2px',
+                      }}>TRADICIONAL</div>
+                      <div style={{
+                        fontFamily: FONT.display, fontWeight: 700,
+                        fontSize: '16px', color: C.red,
+                      }}>{row.before}</div>
+                    </div>
+                    <div style={{ flex: 1, padding: '8px 12px' }}>
+                      <div style={{
+                        fontFamily: FONT.mono, fontSize: '9px',
+                        color: C.muted, marginBottom: '2px',
+                      }}>H-SHIELD</div>
+                      <div style={{
+                        fontFamily: FONT.display, fontWeight: 700,
+                        fontSize: '16px', color: C.green,
+                      }}>{row.after}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </Appear>
         </FlexBox>
         <Notes>
           A terceira coluna é a relevante para essa banca.
-          "Automação de análise de sinistros com dados que nenhuma parte pode contestar."
+          Mostre a tabela comparativa: "Automação não reduz cobertura — expande acesso a produtores menores."
         </Notes>
       </Slide>
 
@@ -1002,45 +1105,45 @@ export default function Presentation() {
         backgroundRepeat="repeat"
       >
         <FlexBox height="100%" flexDirection="column" justifyContent="center" style={{ padding: '0 80px' }}>
-          <Label>Plano de expansão</Label>
+          <Label>Piloto técnico — 90 dias</Label>
           <div style={{
             fontFamily: FONT.display, fontWeight: 700,
             fontSize: '44px', color: C.text,
             letterSpacing: '-0.5px', marginBottom: '32px',
           }}>
-            Software validado.{' '}
-            <span style={{ color: C.blue }}>Hardware a seguir.</span>
+            Experimental.{' '}
+            <span style={{ color: C.blue }}>Sem risco para o Bradesco.</span>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
-            <PhaseCol index={1} phase="HOJE" color={C.blue} done
+            <PhaseCol index={1} phase="DIAS 1–30" color={C.blue} done={false}
               items={[
-                'Firmware C++ completo e testado',
-                'Backend em produção — Supabase',
-                'Dashboard em tempo real com status blockchain',
-                'Autenticação ECDSA + Proof of Work ativa',
+                'Instalação de sensores em propriedades selecionadas',
+                'Calibração e coleta contínua de umidade e precipitação',
+                'Dashboard de monitoramento em tempo real',
+                'Uptime de sensores > 95%',
               ]}
             />
-            <PhaseCol index={2} phase="6 MESES" color={C.blueLt}
+            <PhaseCol index={2} phase="DIAS 31–60" color={C.blueLt}
               items={[
-                'Sensores físicos instalados em campo',
-                'Comunicação LoRaWAN para áreas rurais sem cobertura',
-                'Alimentação solar — operação autônoma',
-                '50 dispositivos ativos em fazendas piloto',
+                'Workshop técnico com áreas do Bradesco',
+                'Definição: cultura, região, janela crítica',
+                'Limiar de excesso hídrico parametrizável',
+                'Entregável: documento de parâmetros validados',
               ]}
             />
-            <PhaseCol index={3} phase="12 MESES" color={C.muted}
+            <PhaseCol index={3} phase="DIAS 61–90" color={C.muted}
               items={[
-                '500+ dispositivos em operação',
-                'API de sinistros integrada a seguradoras',
-                'Integração com crédito rural Bradesco',
-                'Processo de certificação Inmetro',
+                'Simulação retroativa com eventos históricos (opcional, NDA)',
+                'Teste do modelo com enchentes de 2024 no RS',
+                'Relatório de aderência e falsos positivos/negativos',
+                'Correlação estatística: R² > 0,85',
               ]}
             />
           </div>
         </FlexBox>
         <Notes>
-          "O investimento vai diretamente para hardware e primeiros pilotos em campo.
-          O software já está pronto — acabaram de ver funcionando."
+          Enfatize: escopo totalmente experimental — sem impacto contratual, sem obrigação futura.
+          "O Bradesco define a cultura, a região e os parâmetros — a plataforma é neutra."
         </Notes>
       </Slide>
 
@@ -1058,10 +1161,11 @@ export default function Presentation() {
             fontSize: '44px', color: C.text,
             letterSpacing: '-0.5px', marginBottom: '32px',
           }}>
-            Duas coisas. Claras.
+            Uma reunião.{' '}
+            <span style={{ color: C.blue }}>Um piloto.</span>
           </div>
           <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch' }}>
-            {/* Parceria */}
+            {/* Piloto */}
             <div style={{
               flex: 1,
               background: `rgba(15,98,254,0.06)`,
@@ -1074,61 +1178,61 @@ export default function Presentation() {
                 fontSize: '24px', color: C.blue,
                 letterSpacing: '0.5px', marginBottom: '4px',
               }}>
-                Parceria estratégica
+                Piloto técnico conjunto
               </div>
               <div style={{
                 fontFamily: FONT.mono, fontSize: '11px',
                 color: C.muted, marginBottom: '18px',
               }}>
-                Co-desenvolvimento do caso de uso
+                90 dias · escopo experimental
               </div>
               <Appear>
-                <BulletRow>Piloto com 3 a 5 produtores da carteira de crédito rural</BulletRow>
+                <BulletRow>2–3 propriedades-piloto (regiões de alta exposição hídrica — Sul do RS)</BulletRow>
               </Appear>
               <Appear>
-                <BulletRow>Acesso ao time de Bradesco Seguros para co-desenhar a integração de API</BulletRow>
+                <BulletRow>Bradesco define: cultura, região, limiar de excesso hídrico</BulletRow>
               </Appear>
               <Appear>
-                <BulletRow>Validação do caso: automação de análise de sinistros agrícolas</BulletRow>
+                <BulletRow>Workshop técnico conjunto para co-desenhar os parâmetros</BulletRow>
               </Appear>
             </div>
 
-            {/* Investimento */}
+            {/* Governança */}
             <div style={{
               flex: 1,
               background: C.surface,
               border: `1px solid ${C.border}`,
-              borderTop: `2px solid ${C.blueLt}`,
+              borderTop: `2px solid ${C.green}`,
               padding: '24px 22px',
             }}>
               <div style={{
                 fontFamily: FONT.display, fontWeight: 700,
-                fontSize: '24px', color: C.blueLt,
+                fontSize: '24px', color: C.green,
                 letterSpacing: '0.5px', marginBottom: '4px',
               }}>
-                Investimento seed
+                Sem risco para o banco
               </div>
               <div style={{
                 fontFamily: FONT.mono, fontSize: '11px',
                 color: C.muted, marginBottom: '18px',
               }}>
-                Hardware físico — Phase 2
+                Governança clara desde o início
               </div>
               <Appear>
-                <BulletRow color={C.blueLt}>Capital para produção do hardware do Phase 2</BulletRow>
+                <BulletRow color={C.green}>Dados pertencem integralmente ao Bradesco</BulletRow>
               </Appear>
               <Appear>
-                <BulletRow color={C.blueLt}>Meta: 50 dispositivos físicos instalados em 6 meses</BulletRow>
+                <BulletRow color={C.green}>Sem exclusividade e sem obrigação após os 90 dias</BulletRow>
               </Appear>
               <Appear>
-                <BulletRow color={C.blueLt}>Retorno: Bradesco como primeiro cliente da API de verificação</BulletRow>
+                <BulletRow color={C.green}>Resultado: validação técnica para seguro paramétrico automatizado</BulletRow>
               </Appear>
             </div>
           </div>
         </FlexBox>
         <Notes>
-          Fale devagar: "três fazendas", "noventa dias".
-          "O retorno do investimento é o Bradesco sendo o primeiro cliente."
+          Fale devagar: "dois a três propriedades", "noventa dias".
+          "Sem impacto contratual, sem exposição financeira para o Bradesco. Os dados pertencem a vocês."
         </Notes>
       </Slide>
 
@@ -1153,8 +1257,8 @@ export default function Presentation() {
             marginBottom: '32px',
           }}>
             90 DIAS.<br />
-            <span style={{ color: C.blue }}>3 FAZENDAS.</span><br />
-            <span className="shimmer-text">BLOCKCHAIN REAL.</span>
+            <span style={{ color: C.blue }}>SEM RISCO.</span><br />
+            <span className="shimmer-text">DADO REAL.</span>
           </div>
 
           <Rule color={C.blue} width="48px" />
@@ -1162,13 +1266,16 @@ export default function Presentation() {
           <div style={{
             fontFamily: FONT.body, fontSize: '18px',
             color: C.dim, textAlign: 'center',
-            maxWidth: '520px', lineHeight: 1.7,
+            maxWidth: '560px', lineHeight: 1.7,
             marginBottom: '36px',
           }}>
             Não pedimos para apostar em uma ideia.<br />
             O sistema{' '}
             <span style={{ color: C.text, fontWeight: 600 }}>funciona</span>
-            {' '}— vocês acabaram de ver.
+            {' '}— vocês acabaram de ver.<br />
+            <span style={{ fontSize: '15px', color: C.muted }}>
+              Próximo passo: reunião técnica conjunta para selecionar as propriedades-piloto.
+            </span>
           </div>
 
           <div style={{
@@ -1180,12 +1287,12 @@ export default function Presentation() {
             fontSize: '22px',
             letterSpacing: '3px',
           }}>
-            VAMOS COMEÇAR?
+            AGENDAMOS A REUNIÃO?
           </div>
         </FlexBox>
         <Notes>
           Fale devagar. Pausa após cada linha. Olhe para a banca ao dizer "funciona".
-          Finalize com: "Obrigado."
+          Finalize com: "O próximo passo é simples — uma reunião técnica para selecionar as propriedades. Obrigado."
         </Notes>
       </Slide>
 
