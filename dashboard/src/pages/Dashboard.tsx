@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useDevices } from '../hooks/useDevices'
-import { useReadings } from '../hooks/useReadings'
+import { useReadings, type TimeWindow } from '../hooks/useReadings'
 import { StellarExplorer } from '../components/StellarExplorer'
 import { BlockchainStatus } from '../components/BlockchainStatus'
 import { TransactionLink } from '../components/TransactionLink'
@@ -62,9 +62,10 @@ function FeedRow({ reading, onTxClick }: {
 export function Dashboard() {
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [explorerHash, setExplorerHash] = useState<string | null>(null)
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>('15min')
 
   const { devices, loading: devLoad } = useDevices()
-  const { readings, loading: readLoad } = useReadings(selectedId)
+  const { readings, loading: readLoad } = useReadings(selectedId, timeWindow)
 
   const latest = readings[0]
 
@@ -93,9 +94,28 @@ export function Dashboard() {
 
   const onlineCount = devices.filter(d => d.isAlive).length
 
+  const disaster = useMemo(() => {
+    if (!latest) return null
+    const { temperature: t, humidity_air: ha, humidity_soil: hs, luminosity: l } = latest
+    if (t != null && hs != null && t > 42 && hs < 10)
+      return { type: 'SECA', icon: '🔥', desc: 'Temperatura extrema e solo seco detectados' }
+    if (ha != null && hs != null && l != null && ha > 95 && hs > 90 && l < 500)
+      return { type: 'TEMPESTADE', icon: '🌧️', desc: 'Umidade extrema e baixa luminosidade detectadas' }
+    if (t != null && ha != null && t < 5 && ha < 25)
+      return { type: 'GEADA', icon: '🥶', desc: 'Temperatura e umidade criticamente baixas' }
+    return null
+  }, [latest])
+
   return (
     <div>
       <div className="beta-banner">🚧 Fase Beta — dados da Stellar Testnet</div>
+      {disaster && (
+        <div className={`disaster-alert disaster-alert--${disaster.type.toLowerCase()}`}>
+          <span className="disaster-alert__icon">{disaster.icon}</span>
+          <span className="disaster-alert__type">ALERTA: {disaster.type}</span>
+          <span className="disaster-alert__desc">{disaster.desc}</span>
+        </div>
+      )}
       {/* KPI Bar */}
       <div className="kpi-bar">
         {kpis.map(k => (
@@ -156,10 +176,18 @@ export function Dashboard() {
         <div className="panel">
           <div className="panel__head">
             <span className="panel__title">Leituras</span>
-            <span className="panel__live">
+            <div className="time-filter">
+              {(['10s', '1min', '15min'] as TimeWindow[]).map(w => (
+                <button
+                  key={w}
+                  className={`time-filter__btn${timeWindow === w ? ' time-filter__btn--active' : ''}`}
+                  onClick={() => setTimeWindow(w)}
+                >
+                  {w}
+                </button>
+              ))}
               <span className="panel__live-dot" />
-              Ao vivo
-            </span>
+            </div>
           </div>
 
           {readLoad ? (

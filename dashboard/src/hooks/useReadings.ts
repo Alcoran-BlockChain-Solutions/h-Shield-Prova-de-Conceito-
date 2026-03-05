@@ -2,17 +2,28 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../config/supabase'
 import type { Reading } from '../types/reading'
 
-const MAX_READINGS = 50
+const MAX_READINGS = 200
 
-export function useReadings(deviceId?: string) {
+export type TimeWindow = '10s' | '1min' | '15min'
+
+const WINDOW_SECONDS: Record<TimeWindow, number> = {
+  '10s': 10,
+  '1min': 60,
+  '15min': 900,
+}
+
+export function useReadings(deviceId?: string, timeWindow: TimeWindow = '15min') {
   const [readings, setReadings] = useState<Reading[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchReadings = useCallback(async () => {
+    const since = new Date(Date.now() - WINDOW_SECONDS[timeWindow] * 1000).toISOString()
+
     let query = supabase
       .from('readings')
       .select('*')
+      .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(MAX_READINGS)
 
@@ -30,7 +41,7 @@ export function useReadings(deviceId?: string) {
 
     setReadings(data || [])
     setLoading(false)
-  }, [deviceId])
+  }, [deviceId, timeWindow])
 
   const prependReading = useCallback((newReading: Reading) => {
     // Only add if matches filter (or no filter)
