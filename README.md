@@ -283,6 +283,24 @@ pio device monitor     # Acompanha logs serial
 
 ---
 
+## Configuracao de URLs
+
+Apos o deploy do Supabase, atualize a URL do projeto nos seguintes arquivos:
+
+| Arquivo | Variavel | Valor |
+|---------|----------|-------|
+| `iot/include/config.h` | `SUPABASE_URL` | `https://<PROJECT_REF>.supabase.co/functions/v1` |
+| `iot/include/config.example.h` | `SUPABASE_URL` | `https://<PROJECT_REF>.supabase.co/functions/v1` |
+| `dashboard/.env` | `VITE_SUPABASE_URL` | `https://<PROJECT_REF>.supabase.co` |
+| `dashboard/.env.example` | `VITE_SUPABASE_URL` | `https://<PROJECT_REF>.supabase.co` |
+| `backend/scripts/.env` | `SUPABASE_URL` | `https://<PROJECT_REF>.supabase.co/functions/v1` |
+| `backend/scripts/.env.example` | `SUPABASE_URL` | `https://<PROJECT_REF>.supabase.co/functions/v1` |
+
+> Substitua `<PROJECT_REF>` pelo Reference ID do seu projeto Supabase (encontrado em **Settings > General**).
+> O `SUPABASE_ANON_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` tambem precisa ser atualizado com a **anon key** do projeto (encontrada em **Settings > API**).
+
+---
+
 ## Mapa de conexoes
 
 ```
