@@ -95,6 +95,7 @@ export function Dashboard() {
 
   return (
     <div>
+      <div className="beta-banner">🚧 Fase Beta — dados da Stellar Testnet</div>
       {/* KPI Bar */}
       <div className="kpi-bar">
         {kpis.map(k => (

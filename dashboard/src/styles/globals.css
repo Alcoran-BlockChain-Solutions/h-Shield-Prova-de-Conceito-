@@ -2,6 +2,18 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Beta Banner ──────────────────────────────────────── */
+.beta-banner {
+  background: #393939;
+  color: #f4f4f4;
+  text-align: center;
+  padding: 6px 0;
+  font-size: 13px;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #525252;
+}
+
 /* ── IBM Carbon Design System — Dark G100 ─────────────── */
 :root {
   /* Surfaces (IBM Gray scale) */
