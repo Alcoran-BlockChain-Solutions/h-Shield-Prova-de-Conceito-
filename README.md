@@ -99,12 +99,16 @@ Isso cria as tabelas:
 
 #### 1.3 Registrar dispositivo
 
-Cada ESP32 precisa estar na tabela `devices` com sua chave publica. No SQL Editor do Supabase:
+Cada ESP32 precisa estar na tabela `devices` com sua chave publica.
+
+> **IMPORTANTE:** O `device_id` e gerado automaticamente pelo ESP32 a partir do MAC address, no formato `esp32-{MAC}` (ex: `esp32-f0b1c9fc8ad4`). Para descobrir o ID do seu dispositivo, conecte o ESP32 via USB e verifique o Serial Monitor (`pio device monitor`) — o ID aparece na inicializacao.
+
+No SQL Editor do Supabase:
 
 ```sql
 INSERT INTO devices (device_id, public_key, name, location)
 VALUES (
-    'esp32-farm-001',
+    'esp32-xxxxxxxxxxxx',  -- substitua pelo device_id do Serial Monitor
     '-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...sua-chave...
 -----END PUBLIC KEY-----',

@@ -84,6 +84,11 @@ X-Device-ID, X-Timestamp, X-PoW-Data, X-PoW-Nonce, X-PoW-Hash, X-Signature
 
 **Oracle returns 202 Accepted** - blockchain recording happens asynchronously via `EdgeRuntime.waitUntil()`
 
+**Device ID generation:**
+- The ESP32 generates its `device_id` automatically from the MAC address: `esp32-{MAC}` (see `iot/src/key_manager.cpp:28`)
+- This ID is sent via the `X-Device-ID` header and must match the `device_id` column in the `devices` table
+- To find a device's ID, check the Serial Monitor output at boot: `Device ID: esp32-xxxxxxxxxxxx`
+
 ## Key Files
 
 | Purpose | Location |
