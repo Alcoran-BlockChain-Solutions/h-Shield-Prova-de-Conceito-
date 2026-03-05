@@ -1,9 +1,0 @@
-installation:
-  version: 6.0.0-alpha.23
-  installDate: 2026-01-13T03:22:46.533Z
-  lastUpdated: 2026-01-13T03:22:46.533Z
-modules:
-  - core
-ides:
-  - claude-code
-  - trae

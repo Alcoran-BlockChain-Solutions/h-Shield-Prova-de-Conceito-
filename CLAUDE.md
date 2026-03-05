@@ -10,15 +10,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 HarvestShield is an IoT agricultural monitoring system with:
-- **Firmware (ESP32 C++)**: Sensor data collection with ECDSA signing and Proof of Work
+- **IoT (ESP32 C++)**: Sensor data collection with ECDSA signing and Proof of Work
 - **Backend (Supabase Edge Functions)**: Data validation, PostgreSQL persistence, Stellar blockchain recording
 - **Dashboard (React + Vite)**: Real-time visualization of sensors and blockchain status
+- **Pitch (React + Vite)**: Presentation slides for investors
 
 ## Build & Development Commands
 
-### Firmware (PlatformIO)
+### IoT / Firmware (PlatformIO)
 ```bash
-cd firmware
+cd iot
 pio run                    # Compile
 pio run -t upload          # Upload to ESP32
 pio device monitor         # Serial monitor
@@ -33,8 +34,9 @@ npm run dev                # Dev server on port 3000
 npm run build              # Production build
 ```
 
-### Supabase
+### Backend / Supabase
 ```bash
+cd backend/supabase
 supabase start             # Local development
 supabase db push           # Push migrations
 supabase functions deploy oracle
@@ -43,7 +45,7 @@ supabase functions deploy get-readings
 
 ### Testing Scripts
 ```bash
-cd scripts
+cd backend/scripts
 python oracle.py           # Test oracle endpoint
 python simulate_esp32.py   # Simulate ESP32 device
 ```
@@ -86,12 +88,13 @@ X-Device-ID, X-Timestamp, X-PoW-Data, X-PoW-Nonce, X-PoW-Hash, X-Signature
 
 | Purpose | Location |
 |---------|----------|
-| Firmware entry | `firmware/src/main.cpp` |
-| Oracle logic | `supabase/functions/oracle/index.ts` |
-| REST API | `supabase/functions/get-readings/index.ts` |
-| DB migrations | `supabase/migrations/*.sql` |
+| IoT entry | `iot/src/main.cpp` |
+| Oracle logic | `backend/supabase/functions/oracle/index.ts` |
+| REST API | `backend/supabase/functions/get-readings/index.ts` |
+| DB migrations | `backend/supabase/migrations/*.sql` |
 | Dashboard page | `dashboard/src/pages/Dashboard.tsx` |
-| Progress tracking | `STATUS.md` |
+| Pitch slides | `pitch/src/Presentation.jsx` |
+| Progress tracking | `docs/STATUS.md` |
 | User manual | `docs/manual-usuario.md` |
 | Architecture | `docs/architecture.md` |
 | PRD | `docs/prd-harvestshield.md` |

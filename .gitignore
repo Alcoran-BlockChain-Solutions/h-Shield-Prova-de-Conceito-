@@ -7,12 +7,20 @@
 .env.stellar
 
 # Supabase local
-supabase/.branches
-supabase/.temp
+backend/supabase/.branches
+backend/supabase/.temp
 
-# IDE
+# IDE / Editor
 .vscode/
 .idea/
+.trae/
+
+# AI tooling
+.firecrawl/
+.playwright-mcp/
+.mcp.json
+_bmad/
+_bmad-output/
 
 # OS
 .DS_Store
@@ -21,15 +29,18 @@ Thumbs.db
 # Logs
 *.log
 
-# BMAD output (optional - uncomment if you don't want to track)
-# _bmad-output/
-
 # PlatformIO
-firmware/.pio/
-firmware/.vscode/
-firmware/include/config.h
-!firmware/include/config.example.h
+iot/.pio/
+iot/.vscode/
+iot/include/config.h
+!iot/include/config.example.h
 
-
+# Node
 node_modules
 dist
+
+# Python
+__pycache__/
+*.pyc
+venv/
+backend/scripts/venv/
