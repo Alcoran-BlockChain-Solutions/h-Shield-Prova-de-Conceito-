@@ -482,7 +482,7 @@ export default function Presentation() {
                   display: 'block',
                 }}
               >
-                SHIELD
+                <span style={{ color: C.green }}>SHIELD</span>
               </div>
             </div>
 
