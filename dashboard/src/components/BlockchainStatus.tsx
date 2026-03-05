@@ -7,7 +7,7 @@ export function BlockchainStatus({ status, error }: Props) {
   const [open, setOpen] = useState(false)
 
   const cls = { pending: 'tx-badge--pending', confirmed: 'tx-badge--confirmed', failed: 'tx-badge--failed' }[status]
-  const lbl = { pending: 'Pendente', confirmed: 'Stellar OK', failed: 'Falhou' }[status]
+  const lbl = { pending: 'Pendente', confirmed: 'Saved on-chain', failed: 'Falhou' }[status]
 
   return (
     <>

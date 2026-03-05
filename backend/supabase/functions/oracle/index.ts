@@ -490,17 +490,18 @@ async function recordOnStellar(
   debug(reqId, "STELLAR", `Horizon URL: ${horizonUrl}`);
 
   try {
-    debug(reqId, "STELLAR", "Loading Stellar SDK...");
-    const StellarModule = await import("https://esm.sh/@stellar/stellar-sdk@11.2.2?bundle&target=browser");
+    debug(reqId, "STELLAR", "Loading Stellar SDK (stellar-base)...");
+    const StellarModule = await import("https://esm.sh/stellar-base@11.1.0?bundle&target=browser");
     const Stellar = StellarModule.default || StellarModule;
 
     const Keypair = Stellar.Keypair || StellarModule.Keypair;
     const TransactionBuilder = Stellar.TransactionBuilder || StellarModule.TransactionBuilder;
     const Operation = Stellar.Operation || StellarModule.Operation;
     const Networks = Stellar.Networks || StellarModule.Networks;
-    const HorizonServer = StellarModule.Horizon?.Server || Stellar.Horizon?.Server || Stellar.Server;
+    const Account = Stellar.Account || StellarModule.Account;
+    const Memo = Stellar.Memo || StellarModule.Memo;
 
-    if (!HorizonServer || !Keypair) {
+    if (!Keypair || !TransactionBuilder) {
       error(reqId, "STELLAR", "Stellar classes not found in SDK");
       return { success: false, error: "Stellar classes not found in SDK" };
     }
@@ -508,18 +509,25 @@ async function recordOnStellar(
     debug(reqId, "STELLAR", "SDK loaded successfully");
 
     const networkPassphrase = isMainnet ? Networks.PUBLIC : Networks.TESTNET;
-    const server = new HorizonServer(horizonUrl);
 
     debug(reqId, "STELLAR", "Creating keypair from secret...");
     const sourceKeypair = Keypair.fromSecret(stellarSecretKey);
-    debug(reqId, "STELLAR", `Public key: ${sourceKeypair.publicKey()}`);
+    const publicKey = sourceKeypair.publicKey();
+    debug(reqId, "STELLAR", `Public key: ${publicKey}`);
 
-    debug(reqId, "STELLAR", "Loading account...");
-    const account = await server.loadAccount(sourceKeypair.publicKey());
-    debug(reqId, "STELLAR", `Account loaded, sequence: ${account.sequence}`);
+    // Load account via fetch (avoids axios dependency)
+    debug(reqId, "STELLAR", "Loading account via Horizon API...");
+    const accountRes = await fetch(`${horizonUrl}/accounts/${publicKey}`);
+    if (!accountRes.ok) {
+      const errBody = await accountRes.text();
+      error(reqId, "STELLAR", `Failed to load account: ${accountRes.status} ${errBody}`);
+      return { success: false, error: `Failed to load account: ${accountRes.status}` };
+    }
+    const accountData = await accountRes.json();
+    const account = new Account(publicKey, accountData.sequence);
+    debug(reqId, "STELLAR", `Account loaded, sequence: ${accountData.sequence}`);
 
     const dataKey = `r_${timestamp}`;
-    const Memo = Stellar.Memo || StellarModule.Memo;
 
     debug(reqId, "STELLAR", `Data key: ${dataKey}`);
     debug(reqId, "STELLAR", `Data value: ${powHash}`);
@@ -543,12 +551,26 @@ async function recordOnStellar(
     debug(reqId, "STELLAR", "Signing transaction...");
     transaction.sign(sourceKeypair);
 
+    // Submit transaction via fetch (avoids axios dependency)
     debug(reqId, "STELLAR", "Submitting transaction (with retry)...");
     const result = await withRetry(
       reqId,
-      () => server.submitTransaction(transaction),
-      3,  // max 3 tentativas
-      2000 // 2s, 4s, 8s backoff
+      async () => {
+        const submitRes = await fetch(`${horizonUrl}/transactions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `tx=${encodeURIComponent(transaction.toEnvelope().toXDR("base64"))}`,
+        });
+        const submitData = await submitRes.json();
+        if (!submitRes.ok) {
+          const err = new Error(`Stellar tx failed: ${submitRes.status}`);
+          (err as unknown as Record<string, unknown>).response = { data: submitData };
+          throw err;
+        }
+        return submitData;
+      },
+      3,
+      2000
     );
 
     debug(reqId, "STELLAR", `SUCCESS! TX Hash: ${result.hash}`);
