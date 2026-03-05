@@ -482,7 +482,7 @@ export default function Presentation() {
                   display: 'block',
                 }}
               >
-                <span style={{ color: C.green }}>SHIELD</span>
+                TESTE-cicd
               </div>
             </div>
 
