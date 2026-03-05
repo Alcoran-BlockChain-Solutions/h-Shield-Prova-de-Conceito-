@@ -6,6 +6,9 @@ import {
 } from 'recharts'
 
 const PERIODS: { value: TimePeriod; label: string }[] = [
+  { value: '10s',  label: '10s' },
+  { value: '1min', label: '1min' },
+  { value: '15min', label: '15min' },
   { value: '1h',  label: '1h' },
   { value: '6h',  label: '6h' },
   { value: '24h', label: '24h' },
@@ -49,7 +52,7 @@ const SENSORS = [
 ]
 
 export function Analytics() {
-  const [period, setPeriod] = useState<TimePeriod>('all')
+  const [period, setPeriod] = useState<TimePeriod>('15min')
   const { data, loading, error, totalReadings, deviceCount } = useAnalyticsData({ period })
 
   return (

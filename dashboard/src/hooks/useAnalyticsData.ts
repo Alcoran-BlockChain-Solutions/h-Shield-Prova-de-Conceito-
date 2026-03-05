@@ -3,7 +3,7 @@ import { supabase } from '../config/supabase'
 import type { Reading } from '../types/reading'
 import { calculateSMA } from '../utils/statistics'
 
-export type TimePeriod = '1h' | '6h' | '24h' | '7d' | '30d' | 'all'
+export type TimePeriod = '10s' | '1min' | '15min' | '1h' | '6h' | '24h' | '7d' | '30d' | 'all'
 
 interface UseAnalyticsDataParams {
   period: TimePeriod
@@ -34,6 +34,9 @@ interface AnalyticsData {
 
 function getPeriodMs(period: TimePeriod): number | null {
   switch (period) {
+    case '10s': return 10 * 1000
+    case '1min': return 60 * 1000
+    case '15min': return 15 * 60 * 1000
     case '1h': return 60 * 60 * 1000
     case '6h': return 6 * 60 * 60 * 1000
     case '24h': return 24 * 60 * 60 * 1000
